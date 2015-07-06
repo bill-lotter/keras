@@ -10,7 +10,7 @@ from . import objectives
 from . import regularizers
 from . import constraints
 from . import callbacks as cbks
-import time, copy
+import time, copy, pprint
 from .utils.generic_utils import Progbar, printv
 from .layers import containers
 from six.moves import range
@@ -78,11 +78,168 @@ def standardize_weights(y, sample_weight=None, class_weight=None):
 
 
 class Model(object):
+    def _fit(self, f, ins, out_labels=[], batch_size=128, nb_epoch=100, verbose=1, callbacks=[], \
+        validation_split=0., val_f=None, val_ins=None, shuffle=True, metrics=[]):
+        '''
+            Abstract fit function for f(*ins). Assume that f returns a list, labelled by out_labels.
+        '''
+        do_validation = False
+        if val_f and val_ins:
+            do_validation = True
+            if verbose:
+                print("Train on %d samples, validate on %d samples" % (len(ins[0]), len(val_ins[0])))
+        else:
+            if 0 < validation_split < 1:
+                do_validation = True
+                split_at = int(len(ins[0]) * (1 - validation_split))
+                (ins, val_ins) = (slice_X(ins, 0, split_at), slice_X(ins, split_at))
+                if verbose:
+                    print("Train on %d samples, validate on %d samples" % (len(ins[0]), len(val_ins[0])))
+
+        nb_train_sample = len(ins[0])
+        index_array = np.arange(nb_train_sample)
+
+        history = cbks.History()
+        if verbose:
+            callbacks = [history, cbks.BaseLogger()] + callbacks
+        else:
+            callbacks = [history] + callbacks
+        callbacks = cbks.CallbackList(callbacks)
+
+        callbacks._set_model(self)
+        callbacks._set_params({
+            'batch_size': batch_size,
+            'nb_epoch': nb_epoch,
+            'nb_sample': nb_train_sample,
+            'verbose': verbose,
+            'do_validation': do_validation,
+            'metrics':metrics,
+        })
+        callbacks.on_train_begin()
+
+        self.stop_training = False
+        for epoch in range(nb_epoch):
+            callbacks.on_epoch_begin(epoch)
+            if shuffle:
+                np.random.shuffle(index_array)
+
+            batches = make_batches(nb_train_sample, batch_size)
+            for batch_index, (batch_start, batch_end) in enumerate(batches):
+                batch_ids = index_array[batch_start:batch_end]
+                ins_batch = slice_X(ins, batch_ids)
+
+                batch_logs = {}
+                batch_logs['batch'] = batch_index
+                batch_logs['size'] = len(batch_ids)
+                callbacks.on_batch_begin(batch_index, batch_logs)
+                outs = f(*ins_batch)
+                if type(outs) != list:
+                    outs = [outs]
+                for l, o in zip(out_labels, outs):
+                    batch_logs[l] = o
+
+                callbacks.on_batch_end(batch_index, batch_logs)
+                
+                if batch_index == len(batches) - 1: # last batch
+                    # validation
+                    epoch_logs = {}
+                    if do_validation:
+                        # replace with self._evaluate
+                        val_outs = val_f(*val_ins)
+                        if type(val_outs) != list:
+                            val_outs = [val_outs]
+                        # same labels assumed
+                        for l, o in zip(out_labels, val_outs):
+                            epoch_logs['val_' + l] = o
+
+            callbacks.on_epoch_end(epoch, epoch_logs)
+            if self.stop_training:
+                break
+
+        callbacks.on_train_end()
+        return history
+
+    def _predict_loop(self, f, ins, batch_size=128, verbose=0):
+        '''
+            Abstract method to loop over some data in batches.
+        '''
+        nb_sample = len(ins[0])
+        outs = []
+        if verbose == 1:
+            progbar = Progbar(target=nb_sample)
+        batches = make_batches(nb_sample, batch_size)
+        index_array = np.arange(nb_sample)
+        for batch_index, (batch_start, batch_end) in enumerate(batches):
+            batch_ids = index_array[batch_start:batch_end]
+            ins_batch = slice_X(ins, batch_ids)
+
+            batch_outs = f(*ins_batch)
+            if type(batch_outs) != list:
+                batch_outs = [batch_outs]
+            if batch_index == 0:
+                for batch_out in batch_outs:
+                    shape = (nb_sample,) + batch_out.shape[1:]
+                    outs.append(np.zeros(shape))
+
+            for i, batch_out in enumerate(batch_outs):
+                outs[i][batch_start:batch_end] = batch_out
+            if verbose == 1:
+                progbar.update(batch_end)
+        return outs
+
+    def _test_loop(self, f, ins, batch_size=128, verbose=0):
+        '''
+            Abstract method to loop over some data in batches.
+        '''
+        nb_sample = len(ins[0])
+        outs = []
+        if verbose == 1:
+            progbar = Progbar(target=nb_sample)
+        batches = make_batches(nb_sample, batch_size)
+        index_array = np.arange(nb_sample)
+        for batch_index, (batch_start, batch_end) in enumerate(batches):
+            batch_ids = index_array[batch_start:batch_end]
+            ins_batch = slice_X(ins, batch_ids)
+
+            batch_outs = f(*ins_batch)
+            if type(batch_outs) == list:
+                if batch_index == 0:
+                    for batch_out in enumerate(batch_outs):
+                        outs.append(0.)
+                for i, batch_out in enumerate(batch_outs):
+                    outs[i] += batch_out * len(batch_ids)
+            else:
+                if batch_index == 0:
+                    outs.append(0.)
+                outs[0] += batch_outs * len(batch_ids)
+
+            if verbose == 1:
+                progbar.update(batch_end)
+        for i, out in enumerate(outs):
+            outs[i] /= nb_sample
+        return outs
+
+
+class Sequential(Model, containers.Sequential):
+    '''
+        Inherits from Model the following methods:
+            - _fit
+            - _predict
+            - _evaluate
+        Inherits from containers.Sequential the following methods:
+            - __init__
+            - add 
+            - get_output
+            - get_input
+            - get_weights
+            - set_weights
+    '''
+
     def compile(self, optimizer, loss, class_mode="categorical", theano_mode=None):
         self.optimizer = optimizers.get(optimizer)
         self.loss = weighted_objective(objectives.get(loss))
 
-        # input of model 
+        # input of model
         self.X_train = self.get_input(train=True)
         self.X_test = self.get_input(train=False)
 
@@ -95,8 +252,12 @@ class Model(object):
         self.weights = T.ones_like(self.y_train)
 
         train_loss = self.loss(self.y, self.y_train, self.weights)
-        test_score = self.loss(self.y, self.y_test, self.weights)
-        
+        test_loss = self.loss(self.y, self.y_test, self.weights)
+
+        train_loss.name = 'train_loss'
+        test_loss.name = 'test_loss'
+        self.y.name = 'y'
+
         if class_mode == "categorical":
             train_accuracy = T.mean(T.eq(T.argmax(self.y, axis=-1), T.argmax(self.y_train, axis=-1)))
             test_accuracy = T.mean(T.eq(T.argmax(self.y, axis=-1), T.argmax(self.y_test, axis=-1)))
@@ -121,19 +282,26 @@ class Model(object):
             test_ins = [self.X_test, self.y, self.weights]
             predict_ins = [self.X_test]
 
-        self._train = theano.function(train_ins, train_loss, 
+        self._train = theano.function(train_ins, train_loss,
             updates=updates, allow_input_downcast=True, mode=theano_mode)
-        self._train_with_acc = theano.function(train_ins, [train_loss, train_accuracy], 
+        self._train_with_acc = theano.function(train_ins, [train_loss, train_accuracy],
             updates=updates, allow_input_downcast=True, mode=theano_mode)
-        self._predict = theano.function(predict_ins, self.y_test, 
+        self._predict = theano.function(predict_ins, self.y_test,
             allow_input_downcast=True, mode=theano_mode)
-        self._test = theano.function(test_ins, test_score, 
+        self._test = theano.function(test_ins, test_loss,
             allow_input_downcast=True, mode=theano_mode)
-        self._test_with_acc = theano.function(test_ins, [test_score, test_accuracy], 
+        self._test_with_acc = theano.function(test_ins, [test_loss, test_accuracy],
             allow_input_downcast=True, mode=theano_mode)
-
 
     def train(self, X, y, accuracy=False, sample_weight=None):
+        warnings.warn('The "train" method is deprecated, use "train_on_batch" instead.')
+        return self.train_on_batch(X, y, accuracy, sample_weight)
+
+    def test(self, X, y, accuracy=False):
+        warnings.warn('The "test" method is deprecated, use "test_on_batch" instead.')
+        return self.test_on_batch(X, y, accuracy)
+
+    def train_on_batch(self, X, y, accuracy=False, sample_weight=None):
         X = standardize_X(X)
         y = standardize_y(y)
 
@@ -149,7 +317,7 @@ class Model(object):
             return self._train(*ins)
         
 
-    def test(self, X, y, accuracy=False):
+    def test_on_batch(self, X, y, accuracy=False):
         X = standardize_X(X)
         y = standardize_y(y)
         sample_weight = np.ones(y.shape[:-1] + (1,))
@@ -160,123 +328,52 @@ class Model(object):
             return self._test(*ins)
 
 
+    def predict_on_batch(self, X):
+        ins = standardize_X(X)
+        return self._predict(*ins)
+
+
     def fit(self, X, y, batch_size=128, nb_epoch=100, verbose=1, callbacks=[],
-            validation_split=0., validation_data=None, shuffle=True, show_accuracy=False, 
+            validation_split=0., validation_data=None, shuffle=True, show_accuracy=False,
             class_weight=None, sample_weight=None):
 
         X = standardize_X(X)
         y = standardize_y(y)
         sample_weight = standardize_weights(y, class_weight=class_weight, sample_weight=sample_weight)
 
-        do_validation = False
+        val_f = None
+        val_ins = None
+        if validation_data or validation_split:
+            if show_accuracy:
+                val_f = self._test_with_acc
+            else:
+                val_f = self._test
         if validation_data:
             try:
                 X_val, y_val = validation_data
             except:
                 raise Exception("Invalid format for validation data; provide a tuple (X_val, y_val). \
                     X_val may be a numpy array or a list of numpy arrays depending on your model input.")
-            do_validation = True
             X_val = standardize_X(X_val)
             y_val = standardize_y(y_val)
-            
-            if verbose:
-                print("Train on %d samples, validate on %d samples" % (len(y), len(y_val)))
+            val_ins = X_val + [y_val, np.ones(y_val.shape[:-1] + (1,))]
+
+        if show_accuracy:
+            f = self._train_with_acc
+            out_labels = ['loss', 'acc']
         else:
-            if 0 < validation_split < 1:
-                # If a validation split size is given (e.g. validation_split=0.2)
-                # then split X into smaller X and X_val,
-                # and split y into smaller y and y_val.
-                do_validation = True
-                split_at = int(len(y) * (1 - validation_split))
-                (X, X_val) = (slice_X(X, 0, split_at), slice_X(X, split_at))
-                (y, y_val) = (y[:split_at], y[split_at:])
-                sample_weight = sample_weight[:split_at]
-                if verbose:
-                    print("Train on %d samples, validate on %d samples" % (len(y), len(y_val)))
+            f = self._train
+            out_labels = ['loss']
 
-        index_array = np.arange(len(y))
-
-        if verbose:
-            callbacks = [cbks.BaseLogger()] + callbacks
-        callbacks = cbks.CallbackList([cbks.History()] + callbacks)
-
-        callbacks._set_model(self)
-        callbacks._set_params({
-            'batch_size': batch_size,
-            'nb_epoch': nb_epoch,
-            'nb_sample': len(y),
-            'verbose': verbose,
-            'do_validation': do_validation,
-            'show_accuracy': show_accuracy
-        })
-        callbacks.on_train_begin()
-
-        self.stop_training = False
-        for epoch in range(nb_epoch):
-            callbacks.on_epoch_begin(epoch)
-            if shuffle:
-                np.random.shuffle(index_array)
-
-            batches = make_batches(len(y), batch_size)
-            for batch_index, (batch_start, batch_end) in enumerate(batches):
-                batch_ids = index_array[batch_start:batch_end]
-                X_batch = slice_X(X, batch_ids)
-                y_batch = y[batch_ids]
-                weight_batch = sample_weight[batch_ids]
-
-                batch_logs = {}
-                batch_logs['batch'] = batch_index
-                batch_logs['size'] = len(batch_ids)
-                callbacks.on_batch_begin(batch_index, batch_logs)
-
-                ins = X_batch + [y_batch, weight_batch]
-                if show_accuracy:
-                    loss, acc = self._train_with_acc(*ins)
-                    batch_logs['accuracy'] = acc
-                else:
-                    loss = self._train(*ins)
-                batch_logs['loss'] = loss
-
-                callbacks.on_batch_end(batch_index, batch_logs)
-                
-                if batch_index == len(batches) - 1: # last batch
-                    # validation
-                    epoch_logs = {}
-                    if do_validation:
-                        if show_accuracy:
-                            val_loss, val_acc = self.evaluate(X_val, y_val, batch_size=batch_size, \
-                                verbose=0, show_accuracy=True)
-                            epoch_logs['val_accuracy'] = val_acc
-                        else:
-                            val_loss = self.evaluate(X_val, y_val, batch_size=batch_size, verbose=0)
-                        epoch_logs['val_loss'] = val_loss
-
-            callbacks.on_epoch_end(epoch, epoch_logs)
-            if self.stop_training:
-                break
-
-        callbacks.on_train_end()
-        return callbacks.callbacks[0] # return history
+        ins = X + [y, sample_weight]
+        metrics = ['loss', 'acc', 'val_loss', 'val_acc']
+        return self._fit(f, ins, out_labels=out_labels, batch_size=batch_size, nb_epoch=nb_epoch, verbose=verbose, callbacks=callbacks, \
+            validation_split=validation_split, val_f=val_f, val_ins=val_ins, shuffle=shuffle, metrics=metrics)
 
 
-    def predict(self, X, batch_size=128, verbose=1):
+    def predict(self, X, batch_size=128, verbose=0):
         X = standardize_X(X)
-        batches = make_batches(len(X[0]), batch_size)
-        if verbose == 1:
-            progbar = Progbar(target=len(X[0]))
-        for batch_index, (batch_start, batch_end) in enumerate(batches):
-            X_batch = slice_X(X, batch_start, batch_end)
-            batch_preds = self._predict(*X_batch)
-
-            if batch_index == 0:
-                shape = (len(X[0]),) + batch_preds.shape[1:]
-                preds = np.zeros(shape)
-            preds[batch_start:batch_end] = batch_preds
-
-            if verbose == 1:
-                progbar.update(batch_end)
-
-        return preds
+        return self._predict_loop(self._predict, X, batch_size, verbose)[0]
 
 
     def predict_proba(self, X, batch_size=128, verbose=1):
@@ -299,63 +396,16 @@ class Model(object):
         y = standardize_y(y)
         sample_weight = standardize_weights(y, sample_weight=sample_weight)
 
+        ins = X + [y, sample_weight]
         if show_accuracy:
-            tot_acc = 0.
-        tot_score = 0.
-        seen = 0
-
-        batches = make_batches(len(y), batch_size)
-        if verbose:
-            progbar = Progbar(target=len(y), verbose=verbose)
-        for batch_index, (batch_start, batch_end) in enumerate(batches):
-            X_batch = slice_X(X, batch_start, batch_end)
-            y_batch = y[batch_start:batch_end]
-            weight_batch = sample_weight[batch_start:batch_end]
-
-            ins = X_batch + [y_batch, weight_batch]
-            if show_accuracy:
-                loss, acc = self._test_with_acc(*ins)
-                tot_acc += acc * len(y_batch)
-                log_values = [('loss', loss), ('acc.', acc)]
-            else:
-                loss = self._test(*ins)
-                log_values = [('loss', loss)]
-            tot_score += loss * len(y_batch)
-            seen += len(y_batch)
-
-            # logging
-            if verbose:
-                progbar.update(batch_end, log_values)
-
-        if show_accuracy:
-            return tot_score / seen, tot_acc / seen
+            f = self._test_with_acc
         else:
-            return tot_score / seen
-
-
-class Sequential(Model, containers.Sequential):
-    '''
-        Inherits from Model the following methods:
-            - compile
-            - train
-            - test
-            - evaluate
-            - fit
-            - predict
-            - predict_proba
-            - predict_classes
-        Inherits from containers.Sequential the following methods:
-            - add 
-            - get_output
-            - get_input
-            - get_weights
-            - set_weights
-    '''
-    def __init__(self):
-        self.layers = []
-        self.params = [] # learnable
-        self.regularizers = [] # same size as params
-        self.constraints = [] # same size as params
+            f = self._test
+        outs = self._test_loop(f, ins, batch_size, verbose)
+        if show_accuracy:
+            return outs
+        else:
+            return outs[0]
 
 
     def get_config(self, verbose=0):
@@ -400,6 +450,10 @@ class Sequential(Model, containers.Sequential):
 
 
     def load_weights(self, filepath):
+        '''
+            This method does not make use of Sequential.set_weights()
+            for backwards compatibility.
+        '''
         # Loads weights from HDF5 file
         import h5py
         f = h5py.File(filepath)
@@ -408,3 +462,131 @@ class Sequential(Model, containers.Sequential):
             weights = [g['param_{}'.format(p)] for p in range(g.attrs['nb_params'])]
             self.layers[k].set_weights(weights)
         f.close()
+
+
+class Graph(Model, containers.Graph):
+    def compile(self, optimizer, loss, theano_mode=None):
+        # loss is a dictionary mapping output name to loss functions
+        ys = []
+        ys_train = []
+        ys_test = []
+        train_loss = 0.
+        test_loss = 0.
+        for output_name in self.output_order:
+            loss_fn = loss[output_name]
+            output = self.outputs[output_name]
+            y_train = output.get_output(True)
+            y_test = output.get_output(False)
+            y = T.zeros_like(y_test)
+            ys.append(y)
+            ys_train.append(y_train)
+            ys_test.append(y_test)
+            
+            train_loss += objectives.get(loss_fn)(y, y_train).mean()
+            test_loss += objectives.get(loss_fn)(y, y_test).mean()
+
+        train_loss.name = 'train_loss'
+        test_loss.name = 'test_loss'
+
+        ins = [self.inputs[name].input for name in self.input_order]
+        train_ins = ins + ys
+        test_ins = ins + ys
+
+        for r in self.regularizers:
+            train_loss = r(train_loss)
+        self.optimizer = optimizers.get(optimizer)
+        updates = self.optimizer.get_updates(self.params, self.constraints, train_loss)
+
+        self._train = theano.function(train_ins, train_loss, 
+            updates=updates, allow_input_downcast=True, mode=theano_mode)
+        self._test = theano.function(test_ins, test_loss, 
+            allow_input_downcast=True, mode=theano_mode)
+        self._predict = theano.function(inputs=ins, outputs=ys_test, 
+            allow_input_downcast=True, mode=theano_mode)
+
+    def train_on_batch(self, data):
+        # data is a dictionary mapping output and input names to arrays
+        ins = [data[name] for name in self.input_order] + [standardize_y(data[name]) for name in self.output_order]
+        return self._train(*ins)
+
+    def test_on_batch(self, data):
+        # data is a dictionary mapping input names to arrays
+        ins = [data[name] for name in self.input_order] + [standardize_y(data[name]) for name in self.output_order]
+        return self._test(*ins)
+
+    def predict_on_batch(self, data):
+        # data is a dictionary mapping input names to arrays
+        ins = [data[name] for name in self.input_order]
+        return self._predict(*ins)
+
+    def fit(self, data, batch_size=128, nb_epoch=100, verbose=1, callbacks=[],
+            validation_split=0., validation_data=None, shuffle=True):
+        ins = [data[name] for name in self.input_order] + [standardize_y(data[name]) for name in self.output_order]
+
+        val_f = None
+        val_ins = None
+        if validation_data or validation_split:
+            val_f = self._test
+        if validation_data:
+            val_ins = [validation_data[name] for name in self.input_order] + [standardize_y(validation_data[name]) for name in self.output_order]
+
+        f = self._train
+        out_labels = self.output_order
+        metrics = self.output_order + ['val_' + m for m in self.output_order]
+        history = self._fit(f, ins, out_labels=out_labels, batch_size=batch_size, nb_epoch=nb_epoch, verbose=verbose, callbacks=callbacks, \
+            validation_split=validation_split, val_f=val_f, val_ins=val_ins, shuffle=shuffle, metrics=metrics)
+        return history
+
+    def evaluate(self, data, batch_size=128, verbose=0):
+        ins = [data[name] for name in self.input_order] + [standardize_y(data[name]) for name in self.output_order]
+        outs = self._test_loop(self._test, ins, batch_size, verbose)
+        return outs[0]
+
+    def predict(self, data, batch_size=128, verbose=0):
+        ins = [data[name] for name in self.input_order]
+        outs = self._predict_loop(self._predict, ins, batch_size, verbose)
+        return dict(zip(self.output_order, outs))
+
+    def save_weights(self, filepath, overwrite=False):
+        # Save weights from all layers to HDF5
+        import h5py
+        import os.path
+        # if file exists and should not be overwritten
+        if not overwrite and os.path.isfile(filepath):
+            import sys
+            get_input = input
+            if sys.version_info[:2] <= (2, 7):
+                get_input = raw_input
+            overwrite = get_input('[WARNING] %s already exists - overwrite? [y/n]' % (filepath))
+            while overwrite not in ['y', 'n']:
+                overwrite = get_input('Enter "y" (overwrite) or "n" (cancel).')
+            if overwrite == 'n':
+                return
+            print('[TIP] Next time specify overwrite=True in save_weights!')
+
+        f = h5py.File(filepath, 'w')
+        g = f.create_group('graph')
+        weights = self.get_weights()
+        g.attrs['nb_params'] = len(weights)
+        for n, param in enumerate(weights):
+            param_name = 'param_{}'.format(n)
+            param_dset = g.create_dataset(param_name, param.shape, dtype=param.dtype)
+            param_dset[:] = param
+        f.flush()
+        f.close()
+
+    def load_weights(self, filepath):
+        # Loads weights from HDF5 file
+        import h5py
+        f = h5py.File(filepath)
+        g = f['graph']
+        weights = [g['param_{}'.format(p)] for p in range(g.attrs['nb_params'])]
+        self.set_weights(weights)
+        f.close()
+
+    def get_config(self, verbose=1):
+        config = super(Graph, self).get_config()
+        if verbose:
+            pp = pprint.PrettyPrinter(indent=4)
+            pp.pprint(config)
+        return config

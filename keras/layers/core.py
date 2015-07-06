@@ -19,15 +19,15 @@ class Layer(object):
     def __init__(self):
         self.params = []
 
-    def connect(self, layer):
+    def set_previous(self, layer):
         if not self.supports_masked_input() and layer.get_output_mask() is not None:
             raise Exception("Attached non-masking layer to layer with masked output")
         self.previous = layer
 
-    def get_output(self, train):
-        raise NotImplementedError
+    def get_output(self, train=False):
+        return self.get_input(train)
 
-    def get_input(self, train):
+    def get_input(self, train=False):
         if hasattr(self, 'previous'):
             return self.previous.get_output(train=train)
         else:
@@ -91,6 +91,7 @@ class Layer(object):
 
         return self.params, regularizers, consts
 
+
 class MaskedLayer(Layer):
     '''
     If your layer trivially supports masking (by simply copying the input mask to the output), then subclass MaskedLayer
@@ -99,56 +100,59 @@ class MaskedLayer(Layer):
     def supports_masked_input(self):
         return True
 
-    def get_input_mask(self, train=None):
+    def get_input_mask(self, train=False):
         if hasattr(self, 'previous'):
             return self.previous.get_output_mask(train)
         else:
             return None
 
-    def get_output_mask(self, train=None):
+    def get_output_mask(self, train=False):
         ''' The default output mask is just the input mask unchanged. Override this in your own
         implementations if, for instance, you are reshaping the input'''
         return self.get_input_mask(train)
 
 
+
 class Merge(object):
-    def __init__(self, models, mode='sum'):
-        ''' Merge the output of a list of models into a single tensor.
+    def __init__(self, layers, mode='sum'):
+        ''' Merge the output of a list of layers or containers into a single tensor.
             mode: {'sum', 'concat'}
         '''
-        if len(models) < 2:
-            raise Exception("Please specify two or more input models to merge")
+        if len(layers) < 2:
+            raise Exception("Please specify two or more input layers (or containers) to merge")
         self.mode = mode
-        self.models = models
+        self.layers = layers
         self.params = []
         self.regularizers = []
         self.constraints = []
-        for m in self.models:
-            self.regularizers += m.regularizers
-            for i in range(len(m.params)):
-                if not m.params[i] in self.params:
-                    self.params.append(m.params[i])
-                    self.constraints.append(m.constraints[i])
+        for l in self.layers:
+            params, regs, consts = l.get_params()
+            self.regularizers += regs
+            # params and constraints have the same size
+            for p, c in zip(params, consts):
+                if not p in self.params:
+                    self.params.append(p)
+                    self.constraints.append(c)
 
     def get_params(self):
         return self.params, self.regularizers, self.constraints
 
     def get_output(self, train=False):
         if self.mode == 'sum':
-            s = self.models[0].get_output(train)
-            for i in range(1, len(self.models)):
-                s += self.models[i].get_output(train)
+            s = self.layers[0].get_output(train)
+            for i in range(1, len(self.layers)):
+                s += self.layers[i].get_output(train)
             return s
         elif self.mode == 'concat':
-            inputs = [self.models[i].get_output(train) for i in range(len(self.models))]
+            inputs = [self.layers[i].get_output(train) for i in range(len(self.layers))]
             return T.concatenate(inputs, axis=-1)
         else:
             raise Exception('Unknown merge mode')
 
     def get_input(self, train=False):
         res = []
-        for i in range(len(self.models)):
-            o = self.models[i].get_input(train)
+        for i in range(len(self.layers)):
+            o = self.layers[i].get_input(train)
             if not type(o) == list:
                 o = [o]
             for output in o:
@@ -168,19 +172,19 @@ class Merge(object):
 
     def get_weights(self):
         weights = []
-        for m in self.models:
-            weights += m.get_weights()
+        for l in self.layers:
+            weights += l.get_weights()
         return weights
 
     def set_weights(self, weights):
-        for i in range(len(self.models)):
-            nb_param = len(self.models[i].params)
-            self.models[i].set_weights(weights[:nb_param])
+        for i in range(len(self.layers)):
+            nb_param = len(self.layers[i].params)
+            self.layers[i].set_weights(weights[:nb_param])
             weights = weights[nb_param:]
 
     def get_config(self):
         return {"name":self.__class__.__name__,
-            "models":[m.get_config() for m in self.models],
+            "layers":[l.get_config() for l in self.layers],
             "mode":self.mode}
 
 
@@ -192,7 +196,7 @@ class Dropout(MaskedLayer):
         super(Dropout, self).__init__()
         self.p = p
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         X = self.get_input(train)
         if self.p > 0.:
             retain_prob = 1. - self.p
@@ -217,7 +221,7 @@ class Activation(MaskedLayer):
         self.target = target
         self.beta = beta
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         X = self.get_input(train)
         return self.activation(X)
 
@@ -238,7 +242,7 @@ class Reshape(Layer):
         super(Reshape, self).__init__()
         self.dims = dims
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         X = self.get_input(train)
         nshape = make_tuple(X.shape[0], *self.dims)
         return theano.tensor.reshape(X, nshape)
@@ -271,7 +275,7 @@ class Flatten(Layer):
     def __init__(self):
         super(Flatten, self).__init__()
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         X = self.get_input(train)
         size = theano.tensor.prod(X.shape) // X.shape[0]
         nshape = (X.shape[0], size)
@@ -289,7 +293,7 @@ class RepeatVector(Layer):
         super(RepeatVector, self).__init__()
         self.n = n
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         X = self.get_input(train)
         tensors = [X]*self.n
         stacked = theano.tensor.stack(*tensors)
@@ -304,7 +308,8 @@ class Dense(Layer):
     '''
         Just your regular fully connected NN layer.
     '''
-    def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None,
+
+    def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None, name=None,
         W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
 
         super(Dense, self).__init__()
@@ -335,7 +340,14 @@ class Dense(Layer):
         if weights is not None:
             self.set_weights(weights)
 
-    def get_output(self, train):
+        if name is not None:
+            self.set_name(name)
+
+    def set_name(self, name):
+        self.W.name = '%s_W' % name
+        self.b.name = '%s_b' % name
+
+    def get_output(self, train=False):
         X = self.get_input(train)
         output = self.activation(T.dot(X, self.W) + self.b)
         return output
@@ -362,7 +374,7 @@ class ActivityRegularization(Layer):
         activity_regularizer.set_layer(self)
         self.regularizers = [activity_regularizer]
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         return self.get_input(train)
 
     def get_config(self):
@@ -410,7 +422,7 @@ class TimeDistributedDense(MaskedLayer):
         if weights is not None:
             self.set_weights(weights)
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         X = self.get_input(train)
         output = self.activation(T.dot(X.dimshuffle(1, 0, 2), self.W) + self.b)
         return output.dimshuffle(1, 0, 2)
@@ -422,6 +434,7 @@ class TimeDistributedDense(MaskedLayer):
             "output_dim":self.output_dim,
             "init":self.init.__name__,
             "activation":self.activation.__name__}
+
 
 class AutoEncoder(Layer):
     '''
@@ -438,7 +451,7 @@ class AutoEncoder(Layer):
         self.encoder = encoder
         self.decoder = decoder
 
-        self.decoder.connect(self.encoder)
+        self.decoder.set_previous(self.encoder)
 
         self.params = []
         self.regularizers = []
@@ -453,8 +466,8 @@ class AutoEncoder(Layer):
         if weights is not None:
             self.set_weights(weights)
 
-    def connect(self, node):
-        self.encoder.connect(node)
+    def set_previous(self, node):
+        self.encoder.set_previous(node)
 
     def get_weights(self):
         weights = []
@@ -474,10 +487,10 @@ class AutoEncoder(Layer):
     def input(self):
         return self.encoder.input
 
-    def _get_hidden(self, train):
+    def _get_hidden(self, train=False):
         return self.encoder.get_output(train)
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         if not train and not self.output_reconstruction:
             return self.encoder.get_output(train)
 
@@ -499,34 +512,6 @@ class AutoEncoder(Layer):
                 "output_reconstruction":self.output_reconstruction,
                 "tie_weights":self.tie_weights}
 
-
-class DenoisingAutoEncoder(AutoEncoder):
-    '''
-        A denoising autoencoder model that inherits the base features from autoencoder
-    '''
-    def __init__(self, encoder=None, decoder=None, output_reconstruction=True, tie_weights=False, weights=None, corruption_level=0.3):
-        super(DenoisingAutoEncoder, self).__init__(encoder, decoder, output_reconstruction, tie_weights, weights)
-        self.corruption_level = corruption_level
-
-    def _get_corrupted_input(self, input):
-        """
-            http://deeplearning.net/tutorial/dA.html
-        """
-        return srng.binomial(size=(self.input_dim, 1), n=1,
-                             p=1-self.corruption_level,
-                             dtype=theano.config.floatX) * input
-
-    def get_input(self, train=False):
-        uncorrupted_input = super(DenoisingAutoEncoder, self).get_input(train)
-        return self._get_corrupted_input(uncorrupted_input)
-
-    def get_config(self):
-        return {"name":self.__class__.__name__,
-                "encoder_config":self.encoder.get_config(),
-                "decoder_config":self.decoder.get_config(),
-                "corruption_level":self.corruption_level,
-                "output_reconstruction":self.output_reconstruction,
-                "tie_weights":self.tie_weights}
 
 
 class MaxoutDense(Layer):
@@ -565,7 +550,7 @@ class MaxoutDense(Layer):
         if weights is not None:
             self.set_weights(weights)
 
-    def get_output(self, train):
+    def get_output(self, train=False):
         X = self.get_input(train)
         # -- don't need activation since it's just linear.
         output = T.max(T.dot(X, self.W) + self.b, axis=1)
