@@ -250,6 +250,7 @@ class Reshape(Layer):
 class CollapseTimesteps(Layer):
     '''
         Make (nb_samples, timesteps, *dims) be (nb_samples*timestep, *dims)
+        where first n_timestep elements are from the first sample
     '''
     def __init__(self, *dims):
         super(Reshape, self).__init__()
