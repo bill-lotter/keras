@@ -111,7 +111,7 @@ class MaskedLayer(Layer):
         return self.get_input_mask(train)
 
 
-class Merge(object): 
+class Merge(object):
     def __init__(self, models, mode='sum'):
         ''' Merge the output of a list of models into a single tensor.
             mode: {'sum', 'concat'}
@@ -247,6 +247,20 @@ class Reshape(Layer):
         return {"name":self.__class__.__name__,
             "dims":self.dims}
 
+class CollapseTimesteps(Layer):
+    '''
+        Make (nb_samples, timesteps, *dims) be (nb_samples*timestep, *dims)
+    '''
+    def __init__(self, *dims):
+        super(Reshape, self).__init__()
+
+    def get_output(self, train):
+        X = self.get_input(train)
+        nshape = (X.shape[0]*X.shape[1],) + X.shape[2:]
+        return theano.tensor.reshape(X, nshape)
+
+    def get_config(self):
+        return {"name":self.__class__.__name__}
 
 class Flatten(Layer):
     '''
@@ -289,7 +303,7 @@ class Dense(Layer):
     '''
         Just your regular fully connected NN layer.
     '''
-    def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None, 
+    def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None,
         W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
 
         super(Dense, self).__init__()
@@ -364,7 +378,7 @@ class TimeDistributedDense(MaskedLayer):
        Tensor output dimensions:  (nb_sample, shared_dimension, output_dim)
 
     '''
-    def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None, 
+    def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None,
         W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
 
         super(TimeDistributedDense, self).__init__()
@@ -519,7 +533,7 @@ class MaxoutDense(Layer):
         Max-out layer, nb_feature is the number of pieces in the piecewise linear approx.
         Refer to http://arxiv.org/pdf/1302.4389.pdf
     '''
-    def __init__(self, input_dim, output_dim, nb_feature=4, init='glorot_uniform', weights=None, 
+    def __init__(self, input_dim, output_dim, nb_feature=4, init='glorot_uniform', weights=None,
         W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
 
         super(MaxoutDense, self).__init__()

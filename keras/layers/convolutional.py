@@ -18,7 +18,7 @@ class Convolution1D(Layer):
 
         nb_row = 1
         nb_col = filter_length
-        
+
         self.nb_filter = nb_filter
         self.stack_size = stack_size
         self.filter_length = filter_length
@@ -75,7 +75,7 @@ class MaxPooling1D(Layer):
         self.pool_length = pool_length
         self.poolsize = (1, pool_length)
         self.ignore_border = ignore_border
-        
+
         self.input = T.tensor4()
         self.params = []
 
@@ -92,8 +92,8 @@ class MaxPooling1D(Layer):
 
 
 class Convolution2D(Layer):
-    def __init__(self, nb_filter, stack_size, nb_row, nb_col, 
-        init='glorot_uniform', activation='linear', weights=None, 
+    def __init__(self, nb_filter, stack_size, nb_row, nb_col,
+        init='glorot_uniform', activation='linear', weights=None,
         border_mode='valid', subsample=(1, 1),
         W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
         super(Convolution2D,self).__init__()
@@ -124,7 +124,7 @@ class Convolution2D(Layer):
         if activity_regularizer:
             activity_regularizer.set_layer(self)
             self.regularizers.append(activity_regularizer)
-            
+
         self.constraints = [W_constraint, b_constraint]
 
         if weights is not None:
@@ -133,7 +133,7 @@ class Convolution2D(Layer):
     def get_output(self, train):
         X = self.get_input(train)
 
-        conv_out = theano.tensor.nnet.conv.conv2d(X, self.W, 
+        conv_out = theano.tensor.nnet.conv.conv2d(X, self.W,
             border_mode=self.border_mode, subsample=self.subsample)
         output = self.activation(conv_out + self.b.dimshuffle('x', 0, 'x', 'x'))
         return output
@@ -168,10 +168,24 @@ class MaxPooling2D(Layer):
             "ignore_border":self.ignore_border}
 
 
+class UnPooling2D(Layer):
+    def __init__(self, unpoolsize=(2, 2)):
+        super(UnPooling2D,self).__init__()
+        self.input = T.tensor4()
+        self.unpoolsize = unpoolsize
+
+    def get_output(self, train):
+        X = self.get_input(train)
+        output = T.zeros((X.shape[0], X.shape[1], X.shape[2]*self.unpoolsize[0], X.shape[3]*self.unpoolsize[1]))
+        output = T.set_subtensor(output[:, :, ::self.unpoolsize[0], ::self.unpoolsize[1]], X)
+        return output
+
+    def get_config(self):
+        return {"name":self.__class__.__name__,
+            "unpoolsize":self.unpoolsize}
 
 # class ZeroPadding2D(Layer): TODO
 
 # class Convolution3D: TODO
 
 # class MaxPooling3D: TODO
-        
