@@ -251,21 +251,42 @@ class Reshape(Layer):
         return {"name":self.__class__.__name__,
             "dims":self.dims}
 
+class ExpandTimesteps(Layer):
+    '''
+        Make (nb_samples*timestep, *dims) be (nb_samples, timesteps, *dims)
+        where first n_timestep elements are from the first sample
+    '''
+    def __init__(self, n_timesteps):
+        super(ExpandTimesteps, self).__init__()
+        self.n_timesteps = n_timesteps
+
+    def get_output(self, train):
+        X = self.get_input(train)
+        nshape = (X.shape[0]/self.n_timesteps, self.n_timesteps) + X.shape[1:]
+        return theano.tensor.reshape(X, nshape)
+
+    def get_config(self):
+        return {"name":self.__class__.__name__,
+            "n_timesteps":self.n_timesteps}
+
+
 class CollapseTimesteps(Layer):
     '''
         Make (nb_samples, timesteps, *dims) be (nb_samples*timestep, *dims)
         where first n_timestep elements are from the first sample
     '''
-    def __init__(self, *dims):
-        super(Reshape, self).__init__()
+    def __init__(self, ndim):
+        super(CollapseTimesteps, self).__init__()
+        self.ndim = ndim
 
     def get_output(self, train):
         X = self.get_input(train)
         nshape = (X.shape[0]*X.shape[1],) + X.shape[2:]
-        return theano.tensor.reshape(X, nshape)
+        return theano.tensor.reshape(X, nshape, self.ndim)
 
     def get_config(self):
-        return {"name":self.__class__.__name__}
+        return {"name":self.__class__.__name__,
+            "ndim":self.ndim}
 
 class Flatten(Layer):
     '''
