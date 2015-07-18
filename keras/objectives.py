@@ -29,7 +29,7 @@ def categorical_crossentropy(y_true, y_pred):
     '''
     y_pred = T.clip(y_pred, epsilon, 1.0 - epsilon)
     # scale preds so that the class probas of each sample sum to 1
-    y_pred /= y_pred.sum(axis=-1, keepdims=True) 
+    y_pred /= y_pred.sum(axis=-1, keepdims=True)
     cce = T.nnet.categorical_crossentropy(y_pred, y_true)
     return cce
 
@@ -37,6 +37,9 @@ def binary_crossentropy(y_true, y_pred):
     y_pred = T.clip(y_pred, epsilon, 1.0 - epsilon)
     bce = T.nnet.binary_crossentropy(y_pred, y_true)
     return bce
+
+def log_prob_error(y_true, y_pred):
+    return T.log(y_true + (-1*np.ones_like(y_true))^(y_true)*y_pred).mean(axis=-1)
 
 # aliases
 mse = MSE = mean_squared_error
@@ -47,4 +50,3 @@ msle = MSLE = mean_squared_logarithmic_error
 from .utils.generic_utils import get_from_module
 def get(identifier):
     return get_from_module(identifier, globals(), 'objective')
-

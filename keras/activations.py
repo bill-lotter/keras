@@ -15,6 +15,9 @@ def softplus(x):
 def relu(x):
     return (x + abs(x)) / 2.0
 
+def satlu(x):
+    return 1 + ( (x-1) - abs(x-1)) / 2.0
+
 def tanh(x):
     return T.tanh(x)
 

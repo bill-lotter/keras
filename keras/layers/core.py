@@ -146,6 +146,9 @@ class Merge(object):
         elif self.mode == 'concat':
             inputs = [self.layers[i].get_output(train) for i in range(len(self.layers))]
             return T.concatenate(inputs, axis=-1)
+        elif self.mode == 'vert_stack':
+            inputs = [self.layers[i].get_output(train) for i in range(len(self.layers))]
+            return T.concatenate(inputs, axis=1)
         else:
             raise Exception('Unknown merge mode')
 
