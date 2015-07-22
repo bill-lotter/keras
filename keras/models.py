@@ -139,7 +139,7 @@ class Model(object):
                     batch_logs[l] = o
 
                 callbacks.on_batch_end(batch_index, batch_logs)
-                
+
                 if batch_index == len(batches) - 1: # last batch
                     # validation
                     epoch_logs = {}
@@ -228,7 +228,7 @@ class Sequential(Model, containers.Sequential):
             - _evaluate
         Inherits from containers.Sequential the following methods:
             - __init__
-            - add 
+            - add
             - get_output
             - get_input
             - get_weights
@@ -315,7 +315,7 @@ class Sequential(Model, containers.Sequential):
             return self._train_with_acc(*ins)
         else:
             return self._train(*ins)
-        
+
 
     def test_on_batch(self, X, y, accuracy=False):
         X = standardize_X(X)
@@ -481,7 +481,7 @@ class Graph(Model, containers.Graph):
             ys.append(y)
             ys_train.append(y_train)
             ys_test.append(y_test)
-            
+
             train_loss += objectives.get(loss_fn)(y, y_train).mean()
             test_loss += objectives.get(loss_fn)(y, y_test).mean()
 
@@ -497,11 +497,11 @@ class Graph(Model, containers.Graph):
         self.optimizer = optimizers.get(optimizer)
         updates = self.optimizer.get_updates(self.params, self.constraints, train_loss)
 
-        self._train = theano.function(train_ins, train_loss, 
+        self._train = theano.function(train_ins, train_loss,
             updates=updates, allow_input_downcast=True, mode=theano_mode)
-        self._test = theano.function(test_ins, test_loss, 
+        self._test = theano.function(test_ins, test_loss,
             allow_input_downcast=True, mode=theano_mode)
-        self._predict = theano.function(inputs=ins, outputs=ys_test, 
+        self._predict = theano.function(inputs=ins, outputs=ys_test,
             allow_input_downcast=True, mode=theano_mode)
 
     def train_on_batch(self, data):

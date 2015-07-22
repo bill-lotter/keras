@@ -14,7 +14,7 @@ class Convolution1D(Layer):
     def __init__(self, input_dim, nb_filter, filter_length,
         init='uniform', activation='linear', weights=None,
         border_mode='valid', subsample_length=1,
-        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
+        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None, params_fixed=False):
 
         super(Convolution1D,self).__init__()
 
@@ -32,7 +32,8 @@ class Convolution1D(Layer):
         self.W = self.init(self.W_shape)
         self.b = shared_zeros((nb_filter,))
 
-        self.params = [self.W, self.b]
+        if not params_fixed:
+            self.params = [self.W, self.b]
 
         self.regularizers = []
         if W_regularizer:
@@ -102,7 +103,7 @@ class Convolution2D(Layer):
     def __init__(self, nb_filter, stack_size, nb_row, nb_col,
         init='glorot_uniform', activation='linear', weights=None,
         border_mode='valid', subsample=(1, 1),
-        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
+        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None, params_fixed=False):
 
         super(Convolution2D,self).__init__()
         self.init = initializations.get(init)
@@ -120,7 +121,8 @@ class Convolution2D(Layer):
         self.W = self.init(self.W_shape)
         self.b = shared_zeros((nb_filter,))
 
-        self.params = [self.W, self.b]
+        if not params_fixed:
+            self.params = [self.W, self.b]
 
         self.regularizers = []
         if W_regularizer:

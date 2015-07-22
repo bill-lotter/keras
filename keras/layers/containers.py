@@ -213,6 +213,3 @@ class Graph(Layer):
             "output_config":self.output_config,
             "node_config":self.node_config,
             "nodes":[self.nodes[c["name"]].get_config() for c in self.node_config]}
-
-
-

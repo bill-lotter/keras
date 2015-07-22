@@ -38,8 +38,11 @@ def binary_crossentropy(y_true, y_pred):
     bce = T.nnet.binary_crossentropy(y_pred, y_true)
     return bce
 
-def log_prob_error(y_true, y_pred):
-    return T.log(y_true + (-1*np.ones_like(y_true))^(y_true)*y_pred).mean(axis=-1)
+def GAN_generator_loss(y_true, y_pred):
+    return T.log(T.ones_like(y_pred) - y_pred).mean(axis=-1)
+
+def GAN_discriminator_loss(y_true, y_pred):
+    return -1.*T.log(y_true*y_pred + (1 - y_true)*(1 - y_pred)).mean(axis=-1)
 
 # aliases
 mse = MSE = mean_squared_error

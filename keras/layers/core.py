@@ -259,18 +259,28 @@ class ExpandTimesteps(Layer):
         Make (nb_samples*timestep, *dims) be (nb_samples, timesteps, *dims)
         where first n_timestep elements are from the first sample
     '''
-    def __init__(self, n_timesteps):
+    def __init__(self, batch_size=None, n_timesteps=None):
         super(ExpandTimesteps, self).__init__()
-        self.n_timesteps = n_timesteps
+        if batch_size is not None:
+            self.division_param = batch_size
+            self.use_batch_size = True
+        else:
+            self.division_param = n_timesteps
+            self.use_batch_size = False
 
     def get_output(self, train):
         X = self.get_input(train)
-        nshape = (X.shape[0]/self.n_timesteps, self.n_timesteps) + X.shape[1:]
+        if self.use_batch_size:
+            nt = X.shape[0]/self.division_param
+        else:
+            nt = self.division_param
+        nshape = (X.shape[0]/nt, nt) + X.shape[1:]
         return theano.tensor.reshape(X, nshape)
 
     def get_config(self):
         return {"name":self.__class__.__name__,
-            "n_timesteps":self.n_timesteps}
+            "division_param":self.division_param,
+            "use_batch_size":self.use_batch_size}
 
 
 class CollapseTimesteps(Layer):
@@ -334,7 +344,7 @@ class Dense(Layer):
     '''
 
     def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None, name=None,
-        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
+        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None, params_fixed=False):
 
         super(Dense, self).__init__()
         self.init = initializations.get(init)
@@ -346,7 +356,8 @@ class Dense(Layer):
         self.W = self.init((self.input_dim, self.output_dim))
         self.b = shared_zeros((self.output_dim))
 
-        self.params = [self.W, self.b]
+        if not params_fixed:
+            self.params = [self.W, self.b]
 
         self.regularizers = []
         if W_regularizer:
@@ -416,7 +427,7 @@ class TimeDistributedDense(MaskedLayer):
 
     '''
     def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None,
-        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None):
+        W_regularizer=None, b_regularizer=None, activity_regularizer=None, W_constraint=None, b_constraint=None, params_fixed=False):
 
         super(TimeDistributedDense, self).__init__()
         self.init = initializations.get(init)
@@ -428,7 +439,8 @@ class TimeDistributedDense(MaskedLayer):
         self.W = self.init((self.input_dim, self.output_dim))
         self.b = shared_zeros((self.output_dim))
 
-        self.params = [self.W, self.b]
+        if not params_fixed:
+            self.params = [self.W, self.b]
 
         self.regularizers = []
         if W_regularizer:
