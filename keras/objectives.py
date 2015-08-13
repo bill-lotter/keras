@@ -39,10 +39,11 @@ def binary_crossentropy(y_true, y_pred):
     return bce
 
 def GAN_generator_loss(y_true, y_pred):
-    return T.log(T.ones_like(y_pred) - y_pred).mean(axis=-1)
+    #y_true should be a two column vector with second column all ones
+    return T.log( epsilon + (y_true - y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
 
 def GAN_discriminator_loss(y_true, y_pred):
-    return -1.*T.log(y_true*y_pred + (1 - y_true)*(1 - y_pred)).mean(axis=-1)
+    return -1.*T.log( epsilon + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
 
 # aliases
 mse = MSE = mean_squared_error

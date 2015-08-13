@@ -3,7 +3,7 @@ from __future__ import print_function
 import theano
 import theano.tensor as T
 import numpy as np
-import warnings, time, copy
+import warnings, time, copy, pdb
 
 from . import optimizers
 from . import objectives
@@ -172,7 +172,6 @@ class Model(object):
         for batch_index, (batch_start, batch_end) in enumerate(batches):
             batch_ids = index_array[batch_start:batch_end]
             ins_batch = slice_X(ins, batch_ids)
-
             batch_outs = f(*ins_batch)
             if type(batch_outs) != list:
                 batch_outs = [batch_outs]
@@ -465,7 +464,7 @@ class Sequential(Model, containers.Sequential):
 
 
 class Graph(Model, containers.Graph):
-    def compile(self, optimizer, loss, theano_mode=None):
+    def compile(self, optimizer, loss, obj_weights=None, theano_mode=None):
         # loss is a dictionary mapping output name to loss functions
         ys = []
         ys_train = []
@@ -482,8 +481,13 @@ class Graph(Model, containers.Graph):
             ys_train.append(y_train)
             ys_test.append(y_test)
 
-            train_loss += objectives.get(loss_fn)(y, y_train).mean()
-            test_loss += objectives.get(loss_fn)(y, y_test).mean()
+            if obj_weights is None:
+                w = 1.0
+            else:
+                w = obj_weights[output_name]
+
+            train_loss += w*objectives.get(loss_fn)(y, y_train).mean()
+            test_loss += w*objectives.get(loss_fn)(y, y_test).mean()
 
         train_loss.name = 'train_loss'
         test_loss.name = 'test_loss'

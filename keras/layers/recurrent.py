@@ -43,7 +43,7 @@ class SimpleRNN(Recurrent):
     '''
     def __init__(self, input_dim, output_dim,
         init='glorot_uniform', inner_init='orthogonal', activation='sigmoid', weights=None,
-        truncate_gradient=-1, return_sequences=False):
+        truncate_gradient=-1, return_sequences=False, params_fixed=False):
 
         super(SimpleRNN,self).__init__()
         self.init = initializations.get(init)
@@ -59,6 +59,8 @@ class SimpleRNN(Recurrent):
         self.U = self.inner_init((self.output_dim, self.output_dim))
         self.b = shared_zeros((self.output_dim))
         self.params = [self.W, self.U, self.b]
+
+        self.params_fixed = params_fixed
 
         if weights is not None:
             self.set_weights(weights)
@@ -355,13 +357,13 @@ class LSTM(Recurrent):
         self.U_o = self.inner_init((self.output_dim, self.output_dim))
         self.b_o = shared_zeros((self.output_dim))
 
-        if not params_fixed:
-            self.params = [
-                self.W_i, self.U_i, self.b_i,
-                self.W_c, self.U_c, self.b_c,
-                self.W_f, self.U_f, self.b_f,
-                self.W_o, self.U_o, self.b_o,
-            ]
+        self.params = [
+            self.W_i, self.U_i, self.b_i,
+            self.W_c, self.U_c, self.b_c,
+            self.W_f, self.U_f, self.b_f,
+            self.W_o, self.U_o, self.b_o,
+        ]
+        self.params_fixed = params_fixed
 
         if weights is not None:
             self.set_weights(weights)

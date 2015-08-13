@@ -4,7 +4,7 @@ import numpy as np
 np.random.seed(1337) # for reproducibility
 
 import sys
-sys.path.insert(0,'/home/bill/Libraries/keras/')
+#sys.path.insert(0,'/home/bill/Libraries/keras/')
 import pickle
 from keras.datasets import mnist
 from keras.models import Sequential

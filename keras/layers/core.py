@@ -254,13 +254,33 @@ class Reshape(Layer):
         return {"name":self.__class__.__name__,
             "dims":self.dims}
 
+class FullReshape(Layer):
+    '''
+        Reshape an output to a certain shape.
+        Can't be used as first layer in a model (no fixed input!)
+        First dimension is assumed to be nb_samples.
+    '''
+    def __init__(self, *dims):
+        super(FullReshape, self).__init__()
+        self.dims = dims
+
+    def get_output(self, train=False):
+        X = self.get_input(train)
+        nshape = make_tuple(*self.dims)
+        return theano.tensor.reshape(X, self.dims)
+
+    def get_config(self):
+        return {"name":self.__class__.__name__,
+            "dims":self.dims}
+
 class ExpandTimesteps(Layer):
     '''
         Make (nb_samples*timestep, *dims) be (nb_samples, timesteps, *dims)
         where first n_timestep elements are from the first sample
     '''
-    def __init__(self, batch_size=None, n_timesteps=None):
+    def __init__(self, ndim, batch_size=None, n_timesteps=None):
         super(ExpandTimesteps, self).__init__()
+        self.ndim = ndim
         if batch_size is not None:
             self.division_param = batch_size
             self.use_batch_size = True
@@ -274,8 +294,12 @@ class ExpandTimesteps(Layer):
             nt = X.shape[0]/self.division_param
         else:
             nt = self.division_param
-        nshape = (X.shape[0]/nt, nt) + X.shape[1:]
-        return theano.tensor.reshape(X, nshape)
+        s0 = T.iround(X.shape[0]/nt)
+        if self.ndim==3:
+            nshape = (s0, nt, X.shape[1])
+        elif self.ndim==4:
+            nshape = (s0, nt, X.shape[1], X.shape[2])
+        return theano.tensor.reshape(X, nshape, self.ndim)
 
     def get_config(self):
         return {"name":self.__class__.__name__,
@@ -300,6 +324,7 @@ class CollapseTimesteps(Layer):
     def get_config(self):
         return {"name":self.__class__.__name__,
             "ndim":self.ndim}
+
 
 class Flatten(Layer):
     '''
@@ -356,8 +381,8 @@ class Dense(Layer):
         self.W = self.init((self.input_dim, self.output_dim))
         self.b = shared_zeros((self.output_dim))
 
-        if not params_fixed:
-            self.params = [self.W, self.b]
+        self.params = [self.W, self.b]
+        self.params_fixed = params_fixed
 
         self.regularizers = []
         if W_regularizer:
@@ -439,8 +464,8 @@ class TimeDistributedDense(MaskedLayer):
         self.W = self.init((self.input_dim, self.output_dim))
         self.b = shared_zeros((self.output_dim))
 
-        if not params_fixed:
-            self.params = [self.W, self.b]
+        self.params = [self.W, self.b]
+        self.params_fixed = params_fixed
 
         self.regularizers = []
         if W_regularizer:

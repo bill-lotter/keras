@@ -1,6 +1,6 @@
 from __future__ import print_function
 import sys
-sys.path.insert(0,'/home/bill/Libraries/keras/')
+#sys.path.insert(0,'/home/bill/Libraries/keras/')
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Dropout
 from keras.layers.recurrent import LSTM

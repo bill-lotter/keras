@@ -28,6 +28,7 @@ keras/layers/containers.py
 keras/layers/convolutional.py
 keras/layers/core.py
 keras/layers/embeddings.py
+keras/layers/noise.py
 keras/layers/normalization.py
 keras/layers/recurrent.py
 keras/preprocessing/__init__.py
@@ -39,6 +40,7 @@ keras/utils/dot_utils.py
 keras/utils/generic_utils.py
 keras/utils/io_utils.py
 keras/utils/np_utils.py
+keras/utils/test_utils.py
 keras/utils/theano_utils.py
 keras/wrappers/__init__.py
 keras/wrappers/scikit_learn.py

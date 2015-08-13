@@ -32,8 +32,8 @@ class Convolution1D(Layer):
         self.W = self.init(self.W_shape)
         self.b = shared_zeros((nb_filter,))
 
-        if not params_fixed:
-            self.params = [self.W, self.b]
+        self.params = [self.W, self.b]
+        self.params_fixed = params_fixed
 
         self.regularizers = []
         if W_regularizer:
@@ -121,8 +121,8 @@ class Convolution2D(Layer):
         self.W = self.init(self.W_shape)
         self.b = shared_zeros((nb_filter,))
 
-        if not params_fixed:
-            self.params = [self.W, self.b]
+        self.params = [self.W, self.b]
+        self.params_fixed = params_fixed
 
         self.regularizers = []
         if W_regularizer:
@@ -199,6 +199,7 @@ class ZeroPadding2D(Layer):
         return {"name":self.__class__.__name__,
                 "width":self.width}
 
+
 class UnPooling2D(Layer):
     def __init__(self, unpoolsize=(2, 2)):
         super(UnPooling2D,self).__init__()
@@ -209,6 +210,22 @@ class UnPooling2D(Layer):
         X = self.get_input(train)
         output = T.zeros((X.shape[0], X.shape[1], X.shape[2]*self.unpoolsize[0], X.shape[3]*self.unpoolsize[1]))
         output = T.set_subtensor(output[:, :, ::self.unpoolsize[0], ::self.unpoolsize[1]], X)
+        return output
+
+    def get_config(self):
+        return {"name":self.__class__.__name__,
+            "unpoolsize":self.unpoolsize}
+
+class AverageUnPooling2D(Layer):
+    def __init__(self, unpoolsize=(2, 2)):
+        super(AverageUnPooling2D,self).__init__()
+        self.input = T.tensor4()
+        self.unpoolsize = unpoolsize
+
+    def get_output(self, train):
+        X = self.get_input(train)
+        output = T.extra_ops.repeat(X, self.unpoolsize[0], axis=-2)
+        output = T.extra_ops.repeat(output, self.unpoolsize[1], axis=-1)
         return output
 
     def get_config(self):

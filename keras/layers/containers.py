@@ -5,7 +5,7 @@ from __future__ import print_function
 import theano.tensor as T
 from ..layers.core import Layer, Merge
 from six.moves import range
-
+import pdb
 def ndim_tensor(ndim):
     if ndim == 2:
         return T.matrix()
@@ -180,10 +180,15 @@ class Graph(Layer):
         self.namespace.add(name)
         self.nodes[name] = layer
         self.node_config.append({'name':name, 'input':input, 'inputs':inputs, 'merge_mode':merge_mode})
-        params, regularizers, constraints = layer.get_params()
-        self.params += params
-        self.regularizers += regularizers
-        self.constraints += constraints
+        if hasattr(layer, 'params_fixed'):
+            p_fixed = layer.params_fixed
+        else:
+            p_fixed = False
+        if not p_fixed:
+            params, regularizers, constraints = layer.get_params()
+            self.params += params
+            self.regularizers += regularizers
+            self.constraints += constraints
 
     def add_output(self, name, input=None, inputs=[], merge_mode='concat'):
         if name in self.namespace:
@@ -194,7 +199,7 @@ class Graph(Layer):
             if input in self.nodes:
                 self.outputs[name] = self.nodes[input]
             elif input in self.inputs:
-                self.ouputs[name] = self.inputs[input]
+                self.outputs[name] = self.inputs[input]
         if inputs:
             to_merge = []
             for n in inputs:
