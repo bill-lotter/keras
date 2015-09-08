@@ -224,8 +224,13 @@ class AverageUnPooling2D(Layer):
 
     def get_output(self, train):
         X = self.get_input(train)
-        output = T.extra_ops.repeat(X, self.unpoolsize[0], axis=-2)
-        output = T.extra_ops.repeat(output, self.unpoolsize[1], axis=-1)
+        output = T.zeros((X.shape[0], X.shape[1], X.shape[2]*self.unpoolsize[0], X.shape[3]*self.unpoolsize[1]))
+        output = T.set_subtensor(output[:, :, ::self.unpoolsize[0], ::self.unpoolsize[1]], X)
+        output = T.set_subtensor(output[:, :, 1::self.unpoolsize[0], ::self.unpoolsize[1]], X)
+        output = T.set_subtensor(output[:, :, ::self.unpoolsize[0], 1::self.unpoolsize[1]], X)
+        output = T.set_subtensor(output[:, :, 1::self.unpoolsize[0], 1::self.unpoolsize[1]], X)
+        #output = T.extra_ops.repeat(X, self.unpoolsize[0], axis=-2)
+        #output = T.extra_ops.repeat(output, self.unpoolsize[1], axis=-1)
         return output
 
     def get_config(self):
