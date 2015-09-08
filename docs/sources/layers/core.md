@@ -7,7 +7,7 @@ keras.layers.core.Layer()
 __Methods__:
 
 ```python
-connect(previous_layer)
+set_previous(previous_layer)
 ```
 
 Connect the input of the current layer to the output of the argument layer.
@@ -20,7 +20,7 @@ Connect the input of the current layer to the output of the argument layer.
 
 
 ```python
-output(train)
+get_output(train)
 ```
 
 Get the output of the layer.
@@ -64,6 +64,12 @@ Set the weights of the parameters of the layer.
 - __Arguments__: 
     - __weights__: List of numpy arrays (one per layer parameter). Should be in the same order as what `get_weights(self)` returns.
 
+
+```python
+get_config()
+```
+
+- __Return__: Configuration dictionary describing the layer.
 
 
 ---
@@ -129,7 +135,7 @@ model.add(TimeDistributedDense(5, 10)) # output shape: (nb_samples, nb_timesteps
 
 ## AutoEncoder
 ```python
-keras.layers.core.AutoEncoder(encoder, decoder, output_reconstruction=True, tie_weights=False, weights=None):
+keras.layers.core.AutoEncoder(encoder, decoder, output_reconstruction=True, weights=None):
 ```
 
 A customizable autoencoder model. If `output_reconstruction = True` then dim(input) = dim(output) else dim(output) = dim(hidden)
@@ -147,8 +153,6 @@ A customizable autoencoder model. If `output_reconstruction = True` then dim(inp
     
     - __output_reconstruction__: If this is False the when .predict() is called the output is the deepest hidden layer's activation. Otherwise the output of the final decoder layer is presented. Be sure your validation data confirms to this logic if you decide to use any.
     
-    - __tie_weights__: If True then the encoder bias is tied to the decoder bias. **Note**: This required the encoder layer corresponding to this decoder layer to be of the same time, eg: Dense:Dense
-    
     - __weights__: list of numpy arrays to set as initial weights. The list should have 1 element, of shape `(input_dim, output_dim)`.
 
 - __Example__:
@@ -160,7 +164,7 @@ encoder = containers.Sequential([Dense(32, 16), Dense(16, 8)])
 decoder = containers.Sequential([Dense(8, 16), Dense(16, 32)])
 
 autoencoder = Sequential()
-autoencoder.add(AutoEncoder(encoder=encoder, decoder=decoder, output_reconstruction=False, tie_weights=True))
+autoencoder.add(AutoEncoder(encoder=encoder, decoder=decoder, output_reconstruction=False))
 ```
 
 
@@ -253,7 +257,27 @@ Note that the output is still a single tensor; `RepeatVector` does not split the
 - __Arguments__:
     - __n__: int. 
 
+---
+
+## Permute
+```python
+keras.layers.core.Permute(dims)
+```
+Permute the dimensions of the input data according to the given tuple. Sometimes useful for connecting RNNs and convnets together.
+
+- __Input shape: This layer does not assume a specific input shape.
+
+- __Output shape: Same as the input shape, but with the dimensions re-ordered according to the ordering specified by the tuple.
+
+- __Argument: tuple specifying the permutation scheme (e.g. `(2, 1)` permutes the first and second dimension of the input).
+
 - __Example__:
+```python
+# input shape: (nb_samples, 10)
+model.add(Dense(10, 50)) # output shape: (nb_samples, 50)
+model.add(Reshape(10, 5)) # output shape: (nb_samples, 10, 5)
+model.add(Permute((2, 1))) #output shape: (nb_samples, 5, 10)
+```
 
 ---
 
@@ -305,11 +329,11 @@ model.add(RepeatVector(2))  # output shape: (nb_samples, 2, 10)
 keras.layers.core.Merge(models, mode='sum')
 ```
 
-Merge the output of a list of layers (or containers) into a single tensor, following one of two modes: `sum` or `concat`. 
+Merge the output of a list of layers (or containers) into a single tensor, following one of three modes: `sum`, `mul` or `concat`. 
 
 - __Arguments__:
     - __layers__: List of layers or [containers](/layers/containers/).
-    - __mode__: String, one of `{'sum', 'concat'}`. `sum` will simply sum the outputs of the layers (therefore all layers should have an output with the same shape). `concat` will concatenate the outputs along the last dimension (therefore all layers should have an output that only differ along the last dimension). 
+    - __mode__: String, one of `{'sum', 'mul', 'concat'}`. `sum` and `mul` will simply sum/multiply the outputs of the layers (therefore all layers should have an output with the same shape). `concat` will concatenate the outputs along the last dimension (therefore all layers should have an output that only differ along the last dimension). 
 
 - __Example__:
 
@@ -333,3 +357,14 @@ model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
 model.fit([X_train, X_train], Y_train, batch_size=128, nb_epoch=20, validation_data=([X_test, X_test], Y_test))
 ```
 
+## Masking
+```python
+keras.layers.core.Masking(mask_value=0.)
+```
+
+Create a mask for the input data by using `mask_value` as the sentinel value which should be masked out.
+Given an input of dimensions `(nb_samples, timesteps, input_dim)`, return the input untouched as output, and supply a mask of shape `(nb_samples, timesteps)` where all timesteps which had *all* their values equal to `mask_value` are masked out.
+
+- __Input shape__: 3D tensor with shape: `(nb_samples, timesteps, features)`.
+
+- __Output shape__: 3D tensor with shape: `(nb_samples, timesteps, features)`.

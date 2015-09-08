@@ -33,3 +33,59 @@ Parametrized linear unit. Similar to a LeakyReLU, where each input unit has its 
 
 - __References__:
     - [Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification](http://arxiv.org/pdf/1502.01852v1.pdf)
+
+---
+
+## ParametricSoftplus
+
+```python
+keras.layers.advanced_activations.ParametricSoftplus(input_shape)
+```
+
+Parametric Softplus of the form: (`f(x) = alpha * (1 + exp(beta * x))`). This is essentially a smooth version of ReLU where the parameters control the sharpness of the rectification. The parameters are initialized to more closely approximate a ReLU than the standard `softplus`: `alpha` initialized to `0.2` and `beta`  initialized to `5.0`. The parameters are fit separately for each hidden unit.
+
+- __Input shape__: Same as `input_shape`. This layer cannot be used as first layer in a model.
+
+- __Output shape__: Same as input.
+
+- __Arguments__:
+    - __input_shape__: tuple.
+
+- __References__:
+    - [Inferring Nonlinear Neuronal Computation Based on Physiologically Plausible Inputs](http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003143)
+
+## Thresholded Linear
+
+```python
+keras.layers.advanced_activations.ThresholdedLinear(theta)
+```
+
+Parametrized linear unit. provides a threshold near zero where values are zeroed.
+
+- __Input shape__: Same as `input_shape`. This layer cannot be used as first layer in a model.
+
+- __Output shape__: Same as input.
+
+- __Arguments__:
+    - __theta__: float >= 0. Threshold location of activation
+
+- __References__:
+    - [Zero-Bias Autoencoders and the Benefits of Co-Adapting Features](http://arxiv.org/pdf/1402.3337.pdf)
+
+## Thresholded ReLu
+
+```python
+keras.layers.advanced_activations.ThresholdedReLu(theta)
+```
+
+Parametrized rectified linear unit. provides a threshold near zero where values are zeroed.
+
+- __Input shape__: Same as `input_shape`. This layer cannot be used as first layer in a model.
+
+- __Output shape__: Same as input.
+
+- __Arguments__:
+    - __theta__: float >= 0. Threshold location of activation
+
+- __References__:
+    - [Zero-Bias Autoencoders and the Benefits of Co-Adapting Features](http://arxiv.org/pdf/1402.3337.pdf)

@@ -6,13 +6,16 @@ keras.layers.recurrent.SimpleRNN(input_dim, output_dim,
         init='glorot_uniform', inner_init='orthogonal', activation='sigmoid', weights=None,
         truncate_gradient=-1, return_sequences=False)
 ```
-Fully connected RNN where output is to fed back to input. Not a particularly useful model, included for demonstration purposes.
+Fully connected RNN where output is to fed back to input. 
 
 - __Input shape__: 3D tensor with shape: `(nb_samples, timesteps, input_dim)`.
 
 - __Output shape__: 
-    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, ouput_dim)`.
+    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, output_dim)`.
     - else: 2D tensor with shape: `(nb_samples, output_dim)`.
+
+- __Masking__: This layer supports masking for input data with a variable number of timesteps To introduce masks to your data, use an [Embedding](embeddings.md) layer with the `mask_zero` parameter set to `True`.
+
 
 - __Arguments__:
     - __input_dim__: dimension of the input.
@@ -44,8 +47,11 @@ Not a particularly useful model, included for demonstration purposes.
 - __Input shape__: 3D tensor with shape: `(nb_samples, timesteps, input_dim)`.
 
 - __Output shape__:
-    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, ouput_dim)`.
+    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, output_dim)`.
     - else: 2D tensor with shape: `(nb_samples, output_dim)`.
+
+- __Masking__: This layer supports masking for input data with a variable number of timesteps To introduce masks to your data, use an [Embedding](embeddings.md) layer with the `mask_zero` parameter set to `True`.
+
 
 - __Arguments__:
     - __input_dim__: dimension of the input.
@@ -76,8 +82,10 @@ Gated Recurrent Unit - Cho et al. 2014.
 - __Input shape__: 3D tensor with shape: `(nb_samples, timesteps, input_dim)`.
 
 - __Output shape__:
-    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, ouput_dim)`.
+    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, output_dim)`.
     - else: 2D tensor with shape: `(nb_samples, output_dim)`.
+
+- __Masking__: This layer supports masking for input data with a variable number of timesteps To introduce masks to your data, use an [Embedding](embeddings.md) layer with the `mask_zero` parameter set to true.
 
 - __Arguments__:
     - __input_dim__: dimension of the input.
@@ -110,11 +118,13 @@ Long-Short Term Memory unit - Hochreiter 1997.
 - __Input shape__: 3D tensor with shape: `(nb_samples, timesteps, input_dim)`.
 
 - __Output shape__:
-    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, ouput_dim)`.
+    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, output_dim)`.
     - else: 2D tensor with shape: `(nb_samples, output_dim)`.
 
+- __Masking__: This layer supports masking for input data with a variable number of timesteps To introduce masks to your data, use an [Embedding](embeddings.md) layer with the `mask_zero` parameter set to true.
+
 - __Arguments__:
-- __input_dim__: dimension of the input.
+    - __input_dim__: dimension of the input.
     - __output_dim__: dimension of the internal projections and the final output.
     - __init__: weight initialization function for the output cell. Can be the name of an existing function (str), or a Theano function (see: [initializations](../initializations.md)).
     - __inner_init__: weight initialization function for the inner cells.
@@ -146,8 +156,10 @@ Top 3 RNN architectures evolved from the evaluation of thousands of models. Serv
 - __Input shape__: 3D tensor with shape: `(nb_samples, timesteps, input_dim)`.
 
 - __Output shape__:
-    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, ouput_dim)`.
+    - if `return_sequences`: 3D tensor with shape: `(nb_samples, timesteps, output_dim)`.
     - else: 2D tensor with shape: `(nb_samples, output_dim)`.
+
+- __Masking__: This layer supports masking for input data with a variable number of timesteps To introduce masks to your data, use an [Embedding](embeddings.md) layer with the `mask_zero` parameter set to true.
 
 - __Arguments__:
     - __input_dim__: dimension of the input.
