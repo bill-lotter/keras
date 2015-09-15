@@ -324,7 +324,8 @@ class LSTM(Recurrent):
     def __init__(self, input_dim, output_dim=128,
                  init='glorot_uniform', inner_init='orthogonal', forget_bias_init='one',
                  activation='tanh', inner_activation='hard_sigmoid',
-                 weights=None, truncate_gradient=-1, return_sequences=False, params_fixed=False):
+                 weights=None, truncate_gradient=-1, return_sequences=False, params_fixed=False,
+                 shared_weights_layer=None):
 
         super(LSTM, self).__init__()
         self.input_dim = input_dim
@@ -339,21 +340,38 @@ class LSTM(Recurrent):
         self.inner_activation = activations.get(inner_activation)
         self.input = T.tensor3()
 
-        self.W_i = self.init((self.input_dim, self.output_dim))
-        self.U_i = self.inner_init((self.output_dim, self.output_dim))
-        self.b_i = shared_zeros((self.output_dim))
+        if shared_weights_layer is None:
+            self.W_i = self.init((self.input_dim, self.output_dim))
+            self.U_i = self.inner_init((self.output_dim, self.output_dim))
+            self.b_i = shared_zeros((self.output_dim))
 
-        self.W_f = self.init((self.input_dim, self.output_dim))
-        self.U_f = self.inner_init((self.output_dim, self.output_dim))
-        self.b_f = self.forget_bias_init((self.output_dim))
+            self.W_f = self.init((self.input_dim, self.output_dim))
+            self.U_f = self.inner_init((self.output_dim, self.output_dim))
+            self.b_f = self.forget_bias_init((self.output_dim))
 
-        self.W_c = self.init((self.input_dim, self.output_dim))
-        self.U_c = self.inner_init((self.output_dim, self.output_dim))
-        self.b_c = shared_zeros((self.output_dim))
+            self.W_c = self.init((self.input_dim, self.output_dim))
+            self.U_c = self.inner_init((self.output_dim, self.output_dim))
+            self.b_c = shared_zeros((self.output_dim))
 
-        self.W_o = self.init((self.input_dim, self.output_dim))
-        self.U_o = self.inner_init((self.output_dim, self.output_dim))
-        self.b_o = shared_zeros((self.output_dim))
+            self.W_o = self.init((self.input_dim, self.output_dim))
+            self.U_o = self.inner_init((self.output_dim, self.output_dim))
+            self.b_o = shared_zeros((self.output_dim))
+        else:
+            self.W_i = shared_weights_layer.W_i
+            self.U_i = shared_weights_layer.U_i
+            self.b_i = shared_weights_layer.b_i
+
+            self.W_f = shared_weights_layer.W_f
+            self.U_f = shared_weights_layer.U_f
+            self.b_f = shared_weights_layer.b_f
+
+            self.W_c = shared_weights_layer.W_c
+            self.U_c = shared_weights_layer.U_c
+            self.b_c = shared_weights_layer.b_c
+
+            self.W_o = shared_weights_layer.W_o
+            self.U_o = shared_weights_layer.U_o
+            self.b_o = shared_weights_layer.b_o
 
         self.params = [
             self.W_i, self.U_i, self.b_i,

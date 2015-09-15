@@ -6,7 +6,6 @@ import theano.tensor as T
 from ..layers.core import Layer, Merge
 from ..utils.theano_utils import ndim_tensor
 from six.moves import range
-<<<<<<< HEAD
 import pdb
 def ndim_tensor(ndim):
     if ndim == 2:
@@ -16,9 +15,7 @@ def ndim_tensor(ndim):
     elif ndim == 4:
         return T.tensor4()
     return T.matrix()
-=======
 
->>>>>>> 36ef1ca7b4b912b1a3496dbe5ec38a25fcc0c085
 
 class Sequential(Layer):
     '''
@@ -207,31 +204,33 @@ class Graph(Layer):
 
         self.namespace.add(name)
         self.nodes[name] = layer
-<<<<<<< HEAD
-        self.node_config.append({'name':name, 'input':input, 'inputs':inputs, 'merge_mode':merge_mode})
-        if hasattr(layer, 'params_fixed'):
-            p_fixed = layer.params_fixed
-        else:
-            p_fixed = False
-        if not p_fixed:
-            params, regularizers, constraints = layer.get_params()
-            self.params += params
-            self.regularizers += regularizers
-            self.constraints += constraints
-=======
+        # self.node_config.append({'name':name, 'input':input, 'inputs':inputs, 'merge_mode':merge_mode})
+        # if hasattr(layer, 'params_fixed'):
+        #     p_fixed = layer.params_fixed
+        # else:
+        #     p_fixed = False
+        # if not p_fixed:
+        #     params, regularizers, constraints = layer.get_params()
+        #     self.params += params
+        #     self.regularizers += regularizers
+        #     self.constraints += constraints
         self.node_config.append({'name': name,
                                  'input': input,
                                  'inputs': inputs,
                                  'merge_mode': merge_mode,
                                  'concat_axis': concat_axis,
                                  'create_output': create_output})
-        layer.init_updates()
-        params, regularizers, constraints, updates = layer.get_params()
-        self.params += params
-        self.regularizers += regularizers
-        self.constraints += constraints
-        self.updates += updates
->>>>>>> 36ef1ca7b4b912b1a3496dbe5ec38a25fcc0c085
+        if hasattr(layer, 'params_fixed'):
+            p_fixed = layer.params_fixed
+        else:
+            p_fixed = False
+        if not p_fixed:
+            layer.init_updates()
+            params, regularizers, constraints, updates = layer.get_params()
+            self.params += params
+            self.regularizers += regularizers
+            self.constraints += constraints
+            self.updates += updates
 
         if create_output:
             self.add_output(name, input=name)
@@ -264,13 +263,6 @@ class Graph(Layer):
                                    'concat_axis': concat_axis})
 
     def get_config(self):
-<<<<<<< HEAD
-        return {"name":self.__class__.__name__,
-            "input_config":self.input_config,
-            "output_config":self.output_config,
-            "node_config":self.node_config,
-            "nodes":[self.nodes[c["name"]].get_config() for c in self.node_config]}
-=======
         return {"name": self.__class__.__name__,
                 "input_config": self.input_config,
                 "node_config": self.node_config,
@@ -278,4 +270,3 @@ class Graph(Layer):
                 "input_order": self.input_order,
                 "output_order": self.output_order,
                 "nodes": dict([(c["name"], self.nodes[c["name"]].get_config()) for c in self.node_config])}
->>>>>>> 36ef1ca7b4b912b1a3496dbe5ec38a25fcc0c085

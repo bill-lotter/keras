@@ -362,7 +362,7 @@ class ExpandTimesteps(Layer):
     def get_output(self, train):
         X = self.get_input(train)
         if self.use_batch_size:
-            nt = X.shape[0]/self.division_param
+            nt = T.iround(X.shape[0]/self.division_param)
         else:
             nt = self.division_param
         s0 = T.iround(X.shape[0]/nt)
@@ -389,7 +389,7 @@ class CollapseTimesteps(Layer):
 
     def get_output(self, train):
         X = self.get_input(train)
-        nshape = (X.shape[0]*X.shape[1],) + X.shape[2:]
+        nshape = make_tuple(X.shape[0]*X.shape[1], X.shape[2]) #(X.shape[0]*X.shape[1],) + X.shape[2:]
         return theano.tensor.reshape(X, nshape, self.ndim)
 
     def get_config(self):
