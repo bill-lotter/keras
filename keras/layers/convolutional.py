@@ -127,7 +127,6 @@ class Convolution2D(Layer):
         else:
             self.W = shared_weights_layer.W
             self.b = shared_weights_layer.b
-            params_fixed = True
 
         self.params = [self.W, self.b]
         self.params_fixed = params_fixed

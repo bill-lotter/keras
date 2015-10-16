@@ -441,7 +441,7 @@ class Dense(Layer):
 
     def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='linear', weights=None, name=None,
                  W_regularizer=None, b_regularizer=None, activity_regularizer=None,
-                 W_constraint=None, b_constraint=None, params_fixed=False):
+                 W_constraint=None, b_constraint=None, params_fixed=False, shared_weights_layer=None):
 
         super(Dense, self).__init__()
         self.init = initializations.get(init)
@@ -450,8 +450,12 @@ class Dense(Layer):
         self.output_dim = output_dim
 
         self.input = T.matrix()
-        self.W = self.init((self.input_dim, self.output_dim))
-        self.b = shared_zeros((self.output_dim))
+        if shared_weights_layer is None:
+            self.W = self.init((self.input_dim, self.output_dim))
+            self.b = shared_zeros((self.output_dim))
+        else:
+            self.W = shared_weights_layer.W
+            self.b = shared_weights_layer.b
 
         self.params = [self.W, self.b]
         self.params_fixed = params_fixed

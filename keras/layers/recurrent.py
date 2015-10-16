@@ -5,7 +5,7 @@ import theano.tensor as T
 import numpy as np
 
 from .. import activations, initializations
-from ..utils.theano_utils import shared_scalar, shared_zeros, alloc_zeros_matrix
+from ..utils.theano_utils import shared_scalar, shared_zeros, alloc_zeros_matrix, floatX
 from ..layers.core import Layer, MaskedLayer
 from six.moves import range
 
@@ -44,7 +44,7 @@ class SimpleRNN(Recurrent):
     '''
     def __init__(self, input_dim, output_dim,
                  init='glorot_uniform', inner_init='orthogonal', activation='sigmoid', weights=None,
-                 truncate_gradient=-1, return_sequences=False, params_fixed=False):
+                 truncate_gradient=-1, return_sequences=False, params_fixed=False, fixed_U=False):
 
         super(SimpleRNN, self).__init__()
         self.init = initializations.get(init)
@@ -59,9 +59,15 @@ class SimpleRNN(Recurrent):
         self.W = self.init((self.input_dim, self.output_dim))
         self.U = self.inner_init((self.output_dim, self.output_dim))
         self.b = shared_zeros((self.output_dim))
-        self.params = [self.W, self.U, self.b]
+        if fixed_U:
+            self.params = [self.W]
+        else:
+            self.params = [self.W, self.U, self.b]
 
         self.params_fixed = params_fixed
+
+        if fixed_U:
+            self.U.set_value(floatX(np.diag(np.ones(self.input_dim))))
 
         if weights is not None:
             self.set_weights(weights)
@@ -421,6 +427,46 @@ class LSTM(Recurrent):
         if self.return_sequences:
             return outputs.dimshuffle((1, 0, 2))
         return outputs[-1]
+
+    def _step_return_all(self,
+              xi_t, xf_t, xo_t, xc_t, mask_tm1,
+              h_tm1, c_tm1, i_tm1, f_tm1, o_tm1,
+              u_i, u_f, u_o, u_c):
+        h_mask_tm1 = mask_tm1 * h_tm1
+        c_mask_tm1 = mask_tm1 * c_tm1
+
+        i_t = self.inner_activation(xi_t + T.dot(h_mask_tm1, u_i))
+        f_t = self.inner_activation(xf_t + T.dot(h_mask_tm1, u_f))
+        c_t = f_t * c_mask_tm1 + i_t * self.activation(xc_t + T.dot(h_mask_tm1, u_c))
+        o_t = self.inner_activation(xo_t + T.dot(h_mask_tm1, u_o))
+        h_t = o_t * self.activation(c_t)
+        return h_t, c_t, i_t, f_t, o_t
+
+    def get_all_outputs(self, train=False):
+        X = self.get_input(train)
+        padded_mask = self.get_padded_shuffled_mask(train, X, pad=1)
+        X = X.dimshuffle((1, 0, 2))
+
+        xi = T.dot(X, self.W_i) + self.b_i
+        xf = T.dot(X, self.W_f) + self.b_f
+        xc = T.dot(X, self.W_c) + self.b_c
+        xo = T.dot(X, self.W_o) + self.b_o
+
+        [outputs, memories, i_vals, f_vals, o_vals], updates = theano.scan(
+            self._step_return_all,
+            sequences=[xi, xf, xo, xc, padded_mask],
+            outputs_info=[
+                T.unbroadcast(alloc_zeros_matrix(X.shape[1], self.output_dim), 1),
+                T.unbroadcast(alloc_zeros_matrix(X.shape[1], self.output_dim), 1),
+                T.unbroadcast(alloc_zeros_matrix(X.shape[1], self.output_dim), 1),
+                T.unbroadcast(alloc_zeros_matrix(X.shape[1], self.output_dim), 1),
+                T.unbroadcast(alloc_zeros_matrix(X.shape[1], self.output_dim), 1)
+            ],
+            non_sequences=[self.U_i, self.U_f, self.U_o, self.U_c],
+            truncate_gradient=self.truncate_gradient)
+        if self.return_sequences:
+            return outputs.dimshuffle((1, 0, 2)), memories.dimshuffle((1, 0, 2)), i_vals.dimshuffle((1, 0, 2)), f_vals.dimshuffle((1, 0, 2)), o_vals.dimshuffle((1, 0, 2))
+        return outputs[-1], memories[-1], i_vals[-1], f_vals[-1], o_vals[-1]
 
     def get_config(self):
         return {"name": self.__class__.__name__,

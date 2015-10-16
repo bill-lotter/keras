@@ -605,11 +605,11 @@ class Graph(Model, containers.Graph):
             else:
                 w = obj_weights[output_name]
 
-            weight = w*T.ones_like(y_test)
+            weight = T.ones_like(y_test)
             weights.append(weight)
             weighted_loss = weighted_objective(objectives.get(loss_fn))
-            train_loss += weighted_loss(y, y_train, weight, mask)
-            test_loss += weighted_loss(y, y_test, weight, mask)
+            train_loss += w*weighted_loss(y, y_train, weight, mask)
+            test_loss += w*weighted_loss(y, y_test, weight, mask)
 
 
         train_loss.name = 'train_loss'
