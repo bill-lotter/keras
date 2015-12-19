@@ -44,7 +44,7 @@ class SimpleRNN(Recurrent):
     '''
     def __init__(self, input_dim, output_dim,
                  init='glorot_uniform', inner_init='orthogonal', activation='sigmoid', weights=None,
-                 truncate_gradient=-1, return_sequences=False, params_fixed=False, fixed_U=False):
+                 truncate_gradient=-1, return_sequences=False, params_fixed=False, fixed_W=False):
 
         super(SimpleRNN, self).__init__()
         self.init = initializations.get(init)
@@ -59,15 +59,15 @@ class SimpleRNN(Recurrent):
         self.W = self.init((self.input_dim, self.output_dim))
         self.U = self.inner_init((self.output_dim, self.output_dim))
         self.b = shared_zeros((self.output_dim))
-        if fixed_U:
-            self.params = [self.W]
+        if fixed_W:
+            self.params = [self.U]
         else:
             self.params = [self.W, self.U, self.b]
 
         self.params_fixed = params_fixed
 
-        if fixed_U:
-            self.U.set_value(floatX(np.diag(np.ones(self.input_dim))))
+        if fixed_W:
+            self.W.set_value(floatX(np.diag(np.ones(self.input_dim))))
 
         if weights is not None:
             self.set_weights(weights)
