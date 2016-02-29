@@ -231,12 +231,13 @@ class MaxPooling1D(Layer):
 
 
 class MaxPooling2D(Layer):
-    def __init__(self, poolsize=(2, 2), stride=None, ignore_border=True):
+    def __init__(self, poolsize=(2, 2), stride=None, ignore_border=True, mode='max'):
         super(MaxPooling2D, self).__init__()
         self.input = T.tensor4()
         self.poolsize = poolsize
         self.stride = stride
         self.ignore_border = ignore_border
+        self.mode = mode
 
     def get_output(self, train):
         X = self.get_input(train)
@@ -247,6 +248,7 @@ class MaxPooling2D(Layer):
         return {"name": self.__class__.__name__,
                 "poolsize": self.poolsize,
                 "ignore_border": self.ignore_border,
+                "mode": self.mode,
                 "stride": self.stride}
 
 

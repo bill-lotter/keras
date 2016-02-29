@@ -204,16 +204,6 @@ class Graph(Layer):
 
         self.namespace.add(name)
         self.nodes[name] = layer
-        # self.node_config.append({'name':name, 'input':input, 'inputs':inputs, 'merge_mode':merge_mode})
-        # if hasattr(layer, 'params_fixed'):
-        #     p_fixed = layer.params_fixed
-        # else:
-        #     p_fixed = False
-        # if not p_fixed:
-        #     params, regularizers, constraints = layer.get_params()
-        #     self.params += params
-        #     self.regularizers += regularizers
-        #     self.constraints += constraints
         self.node_config.append({'name': name,
                                  'input': input,
                                  'inputs': inputs,

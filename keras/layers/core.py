@@ -412,6 +412,34 @@ class Flatten(Layer):
         return theano.tensor.reshape(X, nshape)
 
 
+class Subtract(Layer):
+    def __init__(self):
+        super(Subtract, self).__init__()
+
+    def get_output(self, train=False):
+        X = self.get_input(train)
+        split = X.shape[-1] // 2
+        return X[:,:split] - X[:,split]
+
+class Scalar_Multiply(Layer):
+    def __init__(self, k):
+        super(Scalar_Multiply, self).__init__()
+        self.k = k
+
+    def get_output(self, train=False):
+        X = self.get_input(train)
+        return self.k*X
+
+
+class GlobalAveragePooling(Layer):
+    def __init__(self):
+        super(GlobalAveragePooling, self).__init__()
+
+    def get_output(self, train=False):
+        X = self.get_input(train)
+        return theano.tensor.mean(X, axis=(2,3), keepdims=True)
+
+
 class RepeatVector(Layer):
     '''
         Repeat input n times.

@@ -586,15 +586,6 @@ class Graph(Model, containers.Graph):
             ys_train.append(y_train)
             ys_test.append(y_test)
 
-
-            # if obj_weights is None:
-            #     w = 1.0
-            # else:
-            #     w = obj_weights[output_name]
-            #
-            # train_loss += w*objectives.get(loss_fn)(y, y_train).mean()
-            # test_loss += w*objectives.get(loss_fn)(y, y_test).mean()
-
             if hasattr(output, "get_output_mask"):
                 mask = output.get_output_mask()
             else:
