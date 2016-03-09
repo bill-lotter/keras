@@ -1173,7 +1173,7 @@ class Graph(Model, containers.Graph):
 
     Inherits from `containers.Graph`.
     '''
-    def compile(self, optimizer, loss, sample_weight_modes={}, obj_weights=None):
+    def compile(self, optimizer, loss, sample_weight_modes={}, loss_weights=None):
         '''Configure the learning process.
 
         # Arguments
@@ -1214,10 +1214,10 @@ class Graph(Model, containers.Graph):
             else:
                 mask = None
 
-            if obj_weights is None:
+            if loss_weights is None:
                 w = 1.0
             else:
-                w = obj_weights[output_name]
+                w = loss_weights[output_name]
 
             if sample_weight_modes.get(output_name) == 'temporal':
                 weight = K.placeholder(ndim=2)
