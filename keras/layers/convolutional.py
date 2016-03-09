@@ -226,7 +226,7 @@ class Convolution2D(Layer):
                  init='glorot_uniform', activation='linear', weights=None,
                  border_mode='valid', subsample=(1, 1), dim_ordering='th',
                  W_regularizer=None, b_regularizer=None, activity_regularizer=None,
-                 W_constraint=None, b_constraint=None, **kwargs):
+                 W_constraint=None, b_constraint=None, shared_layer=None, **kwargs):
 
         if border_mode not in {'valid', 'same'}:
             raise Exception('Invalid border mode for Convolution2D:', border_mode)
@@ -261,8 +261,12 @@ class Convolution2D(Layer):
             self.W_shape = (self.nb_row, self.nb_col, stack_size, self.nb_filter)
         else:
             raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
-        self.W = self.init(self.W_shape, name='{}_W'.format(self.name))
-        self.b = K.zeros((self.nb_filter,), name='{}_b'.format(self.name))
+        if shared_layer is None:
+            self.W = self.init(self.W_shape, name='{}_W'.format(self.name))
+            self.b = K.zeros((self.nb_filter,), name='{}_b'.format(self.name))
+        else:
+            self.W = shared_layer.W
+            self.b = shared_layer.b
         self.trainable_weights = [self.W, self.b]
         self.regularizers = []
 
