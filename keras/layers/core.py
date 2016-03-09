@@ -456,10 +456,10 @@ class Merge(Layer):
             raise Exception('Please specify two or more input layers '
                             '(or containers) to merge')
 
-        if mode not in {'sum', 'mul', 'concat', 'ave', 'join', 'cos', 'dot'}:
+        if mode not in {'sum', 'mul', 'concat', 'ave', 'join', 'cos', 'dot', 'diff'}:
             raise Exception('Invalid merge mode: ' + str(mode))
 
-        if mode in {'sum', 'mul', 'ave', 'cos'}:
+        if mode in {'sum', 'mul', 'ave', 'cos', 'diff'}:
             input_shapes = set([l.output_shape for l in layers])
             if len(input_shapes) > 1:
                 raise Exception('Only layers of same output shape can '
@@ -529,7 +529,7 @@ class Merge(Layer):
     @property
     def output_shape(self):
         input_shapes = [layer.output_shape for layer in self.layers]
-        if self.mode in ['sum', 'mul', 'ave']:
+        if self.mode in ['sum', 'mul', 'ave', 'diff']:
             return input_shapes[0]
         elif self.mode == 'concat':
             output_shape = list(input_shapes[0])
@@ -565,6 +565,11 @@ class Merge(Layer):
                 s += self.layers[i].get_output(train)
             if self.mode == 'ave':
                 s /= len(self.layers)
+            return s
+        elif self.mode == 'diff':
+            s = self.layers[0].get_output(train)
+            for i in range(1, len(self.layers)):
+                s -= self.layers[i].get_output(train)
             return s
         elif self.mode == 'concat':
             inputs = [self.layers[i].get_output(train) for i in range(len(self.layers))]
