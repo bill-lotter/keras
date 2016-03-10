@@ -250,6 +250,7 @@ class Convolution2D(Layer):
         self.constraints = [self.W_constraint, self.b_constraint]
 
         self.initial_weights = weights
+        self.shared_layer = shared_layer
         super(Convolution2D, self).__init__(**kwargs)
 
     def build(self):
@@ -261,12 +262,12 @@ class Convolution2D(Layer):
             self.W_shape = (self.nb_row, self.nb_col, stack_size, self.nb_filter)
         else:
             raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
-        if shared_layer is None:
+        if self.shared_layer is None:
             self.W = self.init(self.W_shape, name='{}_W'.format(self.name))
             self.b = K.zeros((self.nb_filter,), name='{}_b'.format(self.name))
         else:
-            self.W = shared_layer.W
-            self.b = shared_layer.b
+            self.W = self.shared_layer.W
+            self.b = self.shared_layer.b
         self.trainable_weights = [self.W, self.b]
         self.regularizers = []
 
