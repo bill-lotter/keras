@@ -26,6 +26,8 @@ def relu(x, alpha=0., max_value=None):
 def satlu(x):
     return 1 + ( (x-1) - abs(x-1)) / 2.0
 
+def negrelu(x):
+    return (abs(x) - x) / 2.0
 
 def tanh(x):
     return K.tanh(x)
