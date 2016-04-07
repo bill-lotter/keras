@@ -1169,7 +1169,7 @@ class Bias(Layer):
 
     def __init__(self, output_dim, init='glorot_uniform', activation='linear', weights=None,
                 b_regularizer=None, activity_regularizer=None,
-                b_constraint=None, input_dim=None, **kwargs):
+                b_constraint=None, input_dim=None, shared_layer=None, **kwargs):
         self.init = initializations.get(init)
         self.activation = activations.get(activation)
         self.output_dim = output_dim
@@ -1181,7 +1181,7 @@ class Bias(Layer):
         self.constraints = [self.b_constraint]
 
         self.initial_weights = weights
-
+        self.shared_layer = shared_layer
         self.input_dim = input_dim
         if self.input_dim:
             kwargs['input_shape'] = (self.input_dim,)
@@ -1190,8 +1190,11 @@ class Bias(Layer):
     def build(self):
         input_dim = self.input_shape[1]
 
-        self.b = K.zeros((self.output_dim,),
-                         name='{}_b'.format(self.name))
+        if self.shared_layer is None:
+            self.b = K.zeros((self.output_dim,),
+                            name='{}_b'.format(self.name))
+        else:
+            self.b = self.shared_layer.b
 
         self.trainable_weights = [self.b]
 
