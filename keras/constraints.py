@@ -83,6 +83,19 @@ class UnitNorm(Constraint):
                 "axis": self.axis}
 
 
+class Range(Constraint):
+    '''Constrain the weights to be within range.
+    '''
+    def __init__(self, low=0., high=1.):
+        self.low = low
+        self.high = high
+
+    def __call__(self, p):
+        p[p < self.low] = low
+        p[p > self.low] = high
+        return p
+
+
 identity = Constraint
 maxnorm = MaxNorm
 nonneg = NonNeg
