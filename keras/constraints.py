@@ -83,7 +83,7 @@ class UnitNorm(Constraint):
                 "axis": self.axis}
 
 
-class Range(Constraint):
+class HardRange(Constraint):
     '''Constrain the weights to be within range.
     '''
     def __init__(self, low=0., high=1.):
