@@ -87,6 +87,10 @@ def weighted_bce(y_true, y_pred):
     e = y_true[:,n:]*( y_true[:,:n]*K.log(y_pred) + (1 - y_true[:,:n])*K.log(1-y_pred) )
     return -1*e.mean(axis=-1)
 
+# y_true is mask
+def masked_sum(y_true, y_pred):
+    return -1.0* K.mean(y_true * y_pred, axis=-1)
+
 # aliases
 mse = MSE = mean_squared_error
 mae = MAE = mean_absolute_error
