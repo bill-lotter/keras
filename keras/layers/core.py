@@ -1185,7 +1185,7 @@ class Bias(Layer):
         self.input_dim = input_dim
         if self.input_dim:
             kwargs['input_shape'] = (self.input_dim,)
-        super(Dense, self).__init__(**kwargs)
+        super(Bias, self).__init__(**kwargs)
 
     def build(self):
         input_dim = self.input_shape[1]
