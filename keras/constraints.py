@@ -91,9 +91,7 @@ class HardRange(Constraint):
         self.high = high
 
     def __call__(self, p):
-        p[p < self.low] = low
-        p[p > self.low] = high
-        return p
+        return K.clip(p, self.low, self.high)
 
 
 identity = Constraint
