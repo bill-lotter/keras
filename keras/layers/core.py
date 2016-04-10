@@ -1167,7 +1167,7 @@ class Dense(Layer):
 class Bias(Layer):
     input_ndim = 2
 
-    def __init__(self, output_dim, init='glorot_uniform', activation='linear', weights=None,
+    def __init__(self, output_dim, init='zero', activation='linear', weights=None,
                 b_regularizer=None, activity_regularizer=None,
                 b_constraint=None, input_dim=None, shared_layer=None, **kwargs):
         self.init = initializations.get(init)
@@ -1191,13 +1191,14 @@ class Bias(Layer):
         input_dim = self.input_shape[1]
 
         if self.shared_layer is None:
-            self.b = K.zeros((self.output_dim,),
+            self.b = self.init((self.output_dim,),
                             name='{}_b'.format(self.name))
         else:
             self.b = self.shared_layer.b
 
         self.trainable_weights = [self.b]
 
+        self.regularizers = []
         if self.b_regularizer:
             self.b_regularizer.set_param(self.b)
             self.regularizers.append(self.b_regularizer)
