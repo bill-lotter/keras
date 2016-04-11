@@ -91,6 +91,11 @@ def weighted_bce(y_true, y_pred):
 def masked_sum(y_true, y_pred):
     return -1.0* K.mean(y_true * y_pred, axis=-1)
 
+def masked_L1(y_true, y_pred):
+    thresh = 10.0
+    mask = y_true <= thresh
+    K.sum(mask * K.abs(y_pred - y_true), axis=-1) / K.sum(mask, axis=1)
+
 # aliases
 mse = MSE = mean_squared_error
 mae = MAE = mean_absolute_error
