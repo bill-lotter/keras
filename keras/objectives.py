@@ -94,7 +94,7 @@ def masked_sum(y_true, y_pred):
 def masked_L1(y_true, y_pred):
     thresh = 10.0
     mask = y_true <= thresh
-    K.sum(mask * K.abs(y_pred - y_true), axis=-1) / K.sum(mask, axis=1)
+    return K.sum(mask * K.abs(y_pred - y_true), axis=-1) / K.sum(mask, axis=1)
 
 # aliases
 mse = MSE = mean_squared_error
