@@ -1167,10 +1167,10 @@ class Dense(Layer):
 class Bias(Layer):
     input_ndim = 2
 
-    def __init__(self, output_dim, init='zero', activation='linear', weights=None,
+    def __init__(self, output_dim, init='zero', init_params={}, activation='linear', weights=None,
                 b_regularizer=None, activity_regularizer=None,
                 b_constraint=None, input_dim=None, shared_layer=None, **kwargs):
-        self.init = initializations.get(init)
+        self.init = initializations.get(init, **init_params)
         self.activation = activations.get(activation)
         self.output_dim = output_dim
 
