@@ -93,8 +93,17 @@ def masked_sum(y_true, y_pred):
 
 def masked_L1(y_true, y_pred):
     thresh = 10.0
-    mask = y_true <= thresh
-    return K.sum(mask * K.abs(y_pred - y_true), axis=-1) / K.sum(mask, axis=1)
+    mask = K.abs(y_true) <= thresh
+    num_mask = K.sum(mask, axis=-1) + K.epsilon()
+    return K.sum(mask * K.abs(y_pred - y_true), axis=-1) / num_mask
+
+def smooth_masked_L1(y_true, y_pred):
+    thresh = 20.0
+    mask = K.abs(y_true) <= thresh
+    num_mask = K.sum(mask, axis=-1) + K.epsilon()
+    abs_x = K.abs(y_true - y_pred)
+    loss = mask * (0.5 + 0.5* K.square(abs_x) * (abs_x < 1) + (abs_x - 0.5)*(abs_x >= 1))
+    return K.sum(loss, axis=-1) / num_mask
 
 # aliases
 mse = MSE = mean_squared_error
