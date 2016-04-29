@@ -1173,7 +1173,7 @@ class Graph(Model, containers.Graph):
 
     Inherits from `containers.Graph`.
     '''
-    def compile(self, optimizer, loss, sample_weight_modes={}, loss_weights=None):
+    def compile(self, optimizer, loss, sample_weight_modes={}, loss_weights=None, to_compile=['train','test','predict']):
         '''Configure the learning process.
 
         # Arguments
@@ -1242,9 +1242,12 @@ class Graph(Model, containers.Graph):
         updates += self.updates
         self.loss = loss
 
-        self._train = K.function(train_ins, [train_loss], updates=updates)
-        self._test = K.function(test_ins, [test_loss], updates=self.state_updates)
-        self._predict = K.function(inputs=ins, outputs=ys_test,
+        if 'train' in to_compile:
+            self._train = K.function(train_ins, [train_loss], updates=updates)
+        if 'test' in to_compile:
+            self._test = K.function(test_ins, [test_loss], updates=self.state_updates)
+        if 'predict' in to_compile:
+            self._predict = K.function(inputs=ins, outputs=ys_test,
                                    updates=self.state_updates)
 
     def fit(self, data, batch_size=128, nb_epoch=100, verbose=1, callbacks=[],
