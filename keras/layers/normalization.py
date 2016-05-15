@@ -115,6 +115,14 @@ class BatchNormalization(Layer):
             out = self.gamma * X_normed + self.beta
         return out
 
+    def output_shape(self):
+        if self.split_calcs:
+            output_shape = self.input_shape
+            output_shape[0] /= 2
+            return output_shape
+        else:
+            return self.input_shape
+
     def get_config(self):
         config = {"name": self.__class__.__name__,
                   "epsilon": self.epsilon,
