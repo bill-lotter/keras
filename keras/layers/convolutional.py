@@ -346,6 +346,80 @@ class Convolution2D(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class Bias2D(Layer):
+    input_ndim = 4
+
+    def __init__(self, activation='linear', weights=None,
+                 dim_ordering='th',
+                 b_regularizer=None, activity_regularizer=None,
+                 b_constraint=None, shared_layer=None, **kwargs):
+
+        self.activation = activations.get(activation)
+        assert dim_ordering in {'tf', 'th'}, 'dim_ordering must be in {tf, th}'
+        self.dim_ordering = dim_ordering
+
+        self.b_regularizer = regularizers.get(b_regularizer)
+        self.activity_regularizer = regularizers.get(activity_regularizer)
+
+        self.b_constraint = constraints.get(b_constraint)
+        self.constraints = [self.b_constraint]
+
+        self.initial_weights = weights
+        self.shared_layer = shared_layer
+        super(Convolution2D, self).__init__(**kwargs)
+
+    def build(self):
+        if self.dim_ordering == 'th':
+            stack_size = self.input_shape[1]
+        elif self.dim_ordering == 'tf':
+            stack_size = self.input_shape[3]
+        else:
+            raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
+        if self.shared_layer is None:
+            self.b = K.zeros((stack_size,), name='{}_b'.format(self.name))
+        else:
+            self.b = self.shared_layer.b
+        self.trainable_weights = [self.b]
+        self.regularizers = []
+
+        if self.b_regularizer:
+            self.b_regularizer.set_param(self.b)
+            self.regularizers.append(self.b_regularizer)
+
+        if self.activity_regularizer:
+            self.activity_regularizer.set_layer(self)
+            self.regularizers.append(self.activity_regularizer)
+
+        if self.initial_weights is not None:
+            self.set_weights(self.initial_weights)
+            del self.initial_weights
+
+    @property
+    def output_shape(self):
+        return self.input_shape
+
+    def get_output(self, train=False):
+        X = self.get_input(train)
+        if self.dim_ordering == 'th':
+            output = X + K.reshape(self.b, (1, self.nb_filter, 1, 1))
+        elif self.dim_ordering == 'tf':
+            output = X + K.reshape(self.b, (1, 1, 1, self.nb_filter))
+        else:
+            raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
+        output = self.activation(output)
+        return output
+
+    def get_config(self):
+        config = {'name': self.__class__.__name__,
+                  'activation': self.activation.__name__,
+                  'dim_ordering': self.dim_ordering,
+                  'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
+                  'activity_regularizer': self.activity_regularizer.get_config() if self.activity_regularizer else None,
+                  'b_constraint': self.b_constraint.get_config() if self.b_constraint else None}
+        base_config = super(Convolution2D, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
 class Convolution3D(Layer):
     '''Convolution operator for filtering windows of three-dimensional inputs.
     When using this layer as the first layer in a model,
