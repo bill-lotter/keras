@@ -366,7 +366,7 @@ class Bias2D(Layer):
 
         self.initial_weights = weights
         self.shared_layer = shared_layer
-        super(Convolution2D, self).__init__(**kwargs)
+        super(Bias2D, self).__init__(**kwargs)
 
     def build(self):
         if self.dim_ordering == 'th':
