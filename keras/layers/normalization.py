@@ -49,7 +49,7 @@ class BatchNormalization(Layer):
         - [Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](http://arxiv.org/pdf/1502.03167v3.pdf)
     '''
     def __init__(self, epsilon=1e-6, mode=0, axis=-1, momentum=0.9,
-                 weights=None, beta_init='zero', gamma_init='one', **kwargs):
+                 weights=None, beta_init='zero', gamma_init='one', split_calcs=False, **kwargs):
         self.beta_init = initializations.get(beta_init)
         self.gamma_init = initializations.get(gamma_init)
         self.epsilon = epsilon
@@ -57,6 +57,7 @@ class BatchNormalization(Layer):
         self.axis = axis
         self.momentum = momentum
         self.initial_weights = weights
+        self.split_calcs = split_calcs
         super(BatchNormalization, self).__init__(**kwargs)
 
     def build(self):
@@ -79,6 +80,11 @@ class BatchNormalization(Layer):
 
     def get_output(self, train):
         X = self.get_input(train)
+        if self.split_calcs:
+            X_real = X[:, :(X.shape[1] / 2)]
+            X = X[:, (X.shape[1]/2):]
+        else:
+            X_real = X
         if self.mode == 0:
             input_shape = self.input_shape
             reduction_axes = list(range(len(input_shape)))
@@ -95,17 +101,17 @@ class BatchNormalization(Layer):
                 std_update = self.momentum * self.running_std + (1-self.momentum) * std
                 self.updates = [(self.running_mean, mean_update),
                                 (self.running_std, std_update)]
-                X_normed = (X - brodcast_m) / (brodcast_std + self.epsilon)
+                X_normed = (X_real - brodcast_m) / (brodcast_std + self.epsilon)
             else:
                 brodcast_m = K.reshape(self.running_mean, broadcast_shape)
                 brodcast_std = K.reshape(self.running_std, broadcast_shape)
-                X_normed = ((X - brodcast_m) /
+                X_normed = ((X_real - brodcast_m) /
                             (brodcast_std + self.epsilon))
             out = K.reshape(self.gamma, broadcast_shape) * X_normed + K.reshape(self.beta, broadcast_shape)
         elif self.mode == 1:
             m = K.mean(X, axis=-1, keepdims=True)
             std = K.std(X, axis=-1, keepdims=True)
-            X_normed = (X - m) / (std + self.epsilon)
+            X_normed = (X_real - m) / (std + self.epsilon)
             out = self.gamma * X_normed + self.beta
         return out
 
