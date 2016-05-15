@@ -115,6 +115,7 @@ class BatchNormalization(Layer):
             out = self.gamma * X_normed + self.beta
         return out
 
+    @property
     def output_shape(self):
         if self.split_calcs:
             output_shape = self.input_shape
