@@ -40,6 +40,9 @@ def sigmoid(x):
 def hard_sigmoid(x):
     return K.hard_sigmoid(x)
 
+def square(x):
+    return K.square(x)
+
 
 def linear(x):
     '''
