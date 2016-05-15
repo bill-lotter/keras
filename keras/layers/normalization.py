@@ -118,9 +118,9 @@ class BatchNormalization(Layer):
     @property
     def output_shape(self):
         if self.split_calcs:
-            output_shape = self.input_shape
+            output_shape = list(self.input_shape)
             output_shape[1] /= 2
-            return output_shape
+            return tuple(output_shape)
         else:
             return self.input_shape
 
