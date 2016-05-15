@@ -119,7 +119,7 @@ class BatchNormalization(Layer):
     def output_shape(self):
         if self.split_calcs:
             output_shape = list(self.input_shape)
-            output_shape[1] /= 2
+            output_shape[0] /= 2
             return tuple(output_shape)
         else:
             return self.input_shape
