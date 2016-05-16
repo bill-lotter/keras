@@ -81,8 +81,8 @@ class BatchNormalization(Layer):
     def get_output(self, train):
         X = self.get_input(train)
         if self.split_calcs:
-            X_real = X[:(X.shape[1] / 2)]
-            X = X[(X.shape[1]/2):]
+            X_real = X[:(X.shape[0] / 2)]
+            X = X[(X.shape[0]/2):]
         else:
             X_real = X
         if self.mode == 0:
