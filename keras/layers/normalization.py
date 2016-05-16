@@ -87,6 +87,10 @@ class BatchNormalization(Layer):
             X_real = X
         if self.mode == 0:
             input_shape = self.input_shape
+            if self.split_calcs:
+                input_shape = list(input_shape)
+                input_shape[0] /= 2
+                input_shape = tuple(input_shape)
             reduction_axes = list(range(len(input_shape)))
             del reduction_axes[self.axis]
             broadcast_shape = [1] * len(input_shape)
