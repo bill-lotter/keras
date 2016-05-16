@@ -401,9 +401,9 @@ class Bias2D(Layer):
     def get_output(self, train=False):
         X = self.get_input(train)
         if self.dim_ordering == 'th':
-            output = X + K.reshape(self.b, (1, self.nb_filter, 1, 1))
+            output = X + K.reshape(self.b, (1, self.input_shape[1], 1, 1))
         elif self.dim_ordering == 'tf':
-            output = X + K.reshape(self.b, (1, 1, 1, self.nb_filter))
+            output = X + K.reshape(self.b, (1, 1, 1, self.input_shape[3]))
         else:
             raise Exception('Invalid dim_ordering: ' + self.dim_ordering)
         output = self.activation(output)
