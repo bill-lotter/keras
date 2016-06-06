@@ -46,20 +46,20 @@ def poisson(y_true, y_pred):
 
 def GAN_generator_loss(y_true, y_pred):
     #y_true should be a two column vector with second column all ones
-    return K.log( epsilon + (y_true - y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
+    return K.log( K.epsilon() + (y_true - y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
 
 def GAN_generator_loss2(y_true, y_pred):
     #y_true should be a two column vector with second column all ones
-    return -1.*K.log( epsilon + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
+    return -1.*K.log( K.epsilon() + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
 
 def my_bce(y_true, y_pred):
-    return -1.*K.log(epsilon + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
+    return -1.*K.log(K.epsilon() + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
 
 def my_bce_pos(y_true, y_pred):
-    return K.log(epsilon + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
+    return K.log(K.epsilon() + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
 
 def GAN_discriminator_loss(y_true, y_pred):
-    return -1.*K.log( epsilon + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
+    return -1.*K.log( K.epsilon() + (y_true*y_pred).sum(axis=-1) ).mean(axis=-1)
 
 def cosine_proximity(y_true, y_pred):
     y_true = K.l2_normalize(y_true, axis=-1)
@@ -82,7 +82,7 @@ def ytrue_weighted_mae(y_true, y_pred):
     return e.mean(axis=-1)
 
 def weighted_bce(y_true, y_pred):
-    y_pred = K.clip(y_pred, epsilon, 1.0 - epsilon)
+    y_pred = K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon())
     n = K.shape(y_true)[-1]/2
     e = y_true[:,n:]*( y_true[:,:n]*K.log(y_pred) + (1 - y_true[:,:n])*K.log(1-y_pred) )
     return -1*e.mean(axis=-1)
