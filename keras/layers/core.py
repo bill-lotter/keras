@@ -1004,9 +1004,10 @@ class Flatten(Layer):
 #         return self.k*X
 
 
-class GlobalAveragePooling(Layer):
-    def __init__(self, **kwargs):
+class GlobalPooling(Layer):
+    def __init__(self, pool_mode, **kwargs):
         super(GlobalAveragePooling, self).__init__(**kwargs)
+        self.pool_mode = pool_mode
 
     @property
     def output_shape(self):
@@ -1015,7 +1016,12 @@ class GlobalAveragePooling(Layer):
 
     def get_output(self, train=False):
         X = self.get_input(train)
-        return K.mean(X, axis=(2,3), keepdims=True)
+        if self.pool_mode in ['average', 'mean', 'avg']:
+            return K.mean(X, axis=(2,3), keepdims=True)
+        elif self.pool_mode == 'max':
+            return K.max(X, axis=(2,3), keepdims=True)
+        else:
+            raise Exception('Invalid pooling mode: ' + str(pool_mode))
 
 
 class RepeatVector(Layer):
