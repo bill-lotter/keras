@@ -1006,7 +1006,7 @@ class Flatten(Layer):
 
 class GlobalPooling(Layer):
     def __init__(self, pool_mode, **kwargs):
-        super(GlobalAveragePooling, self).__init__(**kwargs)
+        super(GlobalPooling, self).__init__(**kwargs)
         self.pool_mode = pool_mode
 
     @property
