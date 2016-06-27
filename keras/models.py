@@ -1468,9 +1468,28 @@ class Graph(Model, containers.Graph):
             weights.append(do_samples)
 
         _stop.set()
-        import pdb; pdb.set_trace()
         return np.average(np.asarray(all_outs),
                           weights=weights)
+
+    def predict_generator(self, generator, nb_val_samples,
+                           verbose=1, **kwargs):
+        done_samples = 0
+        all_outs = []
+        weights = []
+        q, _stop = generator_queue(generator, **kwargs)
+
+        while done_samples < nb_val_samples:
+            data, sample_weight = self._check_generator_output(q.get(), _stop)
+            do_samples = len(data[next(iter(data.keys()))])
+            outs = self.predict(data, batch_size=do_samples,
+                                 verbose=verbose)
+            all_outs.append(outs)
+
+            done_samples += do_samples
+            weights.append(do_samples)
+
+        _stop.set()
+        return dict(zip(self.output_order, outs))
 
     def _check_generator_output(self, generator_output, stop):
         '''Verifies the output of a generator to make sure
