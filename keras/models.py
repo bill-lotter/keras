@@ -1472,7 +1472,7 @@ class Graph(Model, containers.Graph):
                           weights=weights)
 
     def predict_generator(self, generator, nb_val_samples,
-                           verbose=1, **kwargs):
+                           verbose=1, pred_layer, **kwargs):
         done_samples = 0
         all_outs = []
         weights = []
@@ -1483,13 +1483,13 @@ class Graph(Model, containers.Graph):
             do_samples = len(data[next(iter(data.keys()))])
             outs = self.predict(data, batch_size=do_samples,
                                  verbose=verbose)
-            all_outs.append(outs)
+            all_outs.append(outs[pred_layer])
 
             done_samples += do_samples
             weights.append(do_samples)
 
         _stop.set()
-        return dict(zip(self.output_order, outs))
+        return outs
 
     def _check_generator_output(self, generator_output, stop):
         '''Verifies the output of a generator to make sure
