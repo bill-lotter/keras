@@ -1468,6 +1468,7 @@ class Graph(Model, containers.Graph):
             weights.append(do_samples)
 
         _stop.set()
+        import pdb; pdb.set_trace()
         return np.average(np.asarray(all_outs),
                           weights=weights)
 
