@@ -1483,7 +1483,7 @@ class Graph(Model, containers.Graph):
             do_samples = len(data[next(iter(data.keys()))])
             outs = self.predict(data, batch_size=do_samples,
                                  verbose=verbose)
-            all_outs += outs[pred_layer].tolist()
+            all_outs += outs[pred_layer].flatten().tolist()
 
             done_samples += do_samples
             weights.append(do_samples)
