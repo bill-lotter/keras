@@ -1471,8 +1471,8 @@ class Graph(Model, containers.Graph):
         return np.average(np.asarray(all_outs),
                           weights=weights)
 
-    def predict_generator(self, generator, nb_val_samples,
-                           verbose=1, pred_layer, **kwargs):
+    def predict_generator(self, generator, nb_val_samples, pred_layer,
+                           verbose=1, **kwargs):
         done_samples = 0
         all_outs = []
         weights = []
