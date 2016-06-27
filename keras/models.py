@@ -1489,7 +1489,7 @@ class Graph(Model, containers.Graph):
             weights.append(do_samples)
 
         _stop.set()
-        return outs
+        return all_outs
 
     def _check_generator_output(self, generator_output, stop):
         '''Verifies the output of a generator to make sure
