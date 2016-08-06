@@ -297,6 +297,7 @@ class Layer(object):
                           'input_dtype',
                           'name',
                           'trainable',
+                          'trainable_by_loss',
                           'create_input_layer'}
         for kwarg in kwargs.keys():
             assert kwarg in allowed_kwargs, 'Keyword argument not understood: ' + kwarg
@@ -308,6 +309,7 @@ class Layer(object):
         self.name = name
 
         self.trainable = kwargs.get('trainable', True)
+        self.trainable_by_loss = kwargs.get('trainable_by_loss', None)
         if 'batch_input_shape' in kwargs or 'input_shape' in kwargs:
             # in this case we will create an input layer
             # to insert before the current layer
@@ -875,7 +877,8 @@ class Layer(object):
         by Container (one layer of abstraction above).
         '''
         config = {'name': self.name,
-                  'trainable': self.trainable}
+                  'trainable': self.trainable,
+                  'trainable_by_loss': self.trainable_by_loss}
         if hasattr(self, 'batch_input_shape'):
             config['batch_input_shape'] = self.batch_input_shape
         if hasattr(self, 'input_dtype'):
@@ -1130,7 +1133,7 @@ class Merge(Layer):
         as appropriate.
         '''
         if not hasattr(mode, '__call__'):
-            if mode not in {'sum', 'mul', 'concat', 'ave', 'cos', 'dot', 'max'}:
+            if mode not in {'sum', 'mul', 'concat', 'ave', 'cos', 'dot', 'max', 'subtract'}:
                 raise Exception('Invalid merge mode: ' + str(mode))
         if type(layers) not in {list, tuple} or len(layers) < 2:
             raise Exception('A Merge should only be applied to a list of '
@@ -1148,7 +1151,7 @@ class Merge(Layer):
                 layer_output_shape = layer_output_shape[tensor_indices[i]]
             input_shapes.append(layer_output_shape)
 
-        if mode in {'sum', 'mul', 'ave', 'cos', 'max'}:
+        if mode in {'sum', 'mul', 'ave', 'cos', 'max', 'subtract'}:
             input_shapes_set = set(input_shapes)
             if len(input_shapes_set) > 1:
                 raise Exception('Only layers of same output shape can '
@@ -1204,6 +1207,12 @@ class Merge(Layer):
                 s += inputs[i]
             if self.mode == 'ave':
                 s /= len(inputs)
+            return s
+
+        elif self.mode == 'subtract:
+            s = inputs[0]
+            for i in range(1, len(inputs)):
+                s -= inputs[i]
             return s
 
         elif self.mode == 'concat':
