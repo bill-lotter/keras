@@ -1133,7 +1133,7 @@ class Merge(Layer):
         as appropriate.
         '''
         if not hasattr(mode, '__call__'):
-            if mode not in {'sum', 'mul', 'concat', 'ave', 'cos', 'dot', 'max', 'subtract'}:
+            if mode not in {'sum', 'mul', 'concat', 'ave', 'cos', 'dot', 'max'}:
                 raise Exception('Invalid merge mode: ' + str(mode))
         if type(layers) not in {list, tuple} or len(layers) < 2:
             raise Exception('A Merge should only be applied to a list of '
@@ -1151,7 +1151,7 @@ class Merge(Layer):
                 layer_output_shape = layer_output_shape[tensor_indices[i]]
             input_shapes.append(layer_output_shape)
 
-        if mode in {'sum', 'mul', 'ave', 'cos', 'max', 'subtract'}:
+        if mode in {'sum', 'mul', 'ave', 'cos', 'max'}:
             input_shapes_set = set(input_shapes)
             if len(input_shapes_set) > 1:
                 raise Exception('Only layers of same output shape can '
@@ -1207,12 +1207,6 @@ class Merge(Layer):
                 s += inputs[i]
             if self.mode == 'ave':
                 s /= len(inputs)
-            return s
-
-        elif self.mode == 'subtract:
-            s = inputs[0]
-            for i in range(1, len(inputs)):
-                s -= inputs[i]
             return s
 
         elif self.mode == 'concat':
