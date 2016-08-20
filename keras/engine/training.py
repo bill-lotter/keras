@@ -238,9 +238,10 @@ def collect_trainable_weights(layer, loss_num=None):
     '''Collects all `trainable_weights` attributes,
     excluding any sublayers where `trainable` is set the `False`.
     '''
-    import pdb; pdb.set_trace()
     if loss_num is not None:
-        if layer.trainable_by_loss is None:
+        if not hasattr(layer, 'trainable_by_loss'):
+            trainable = getattr(layer, 'trainable', True)
+        elif layer.trainable_by_loss is None:
             trainable = getattr(layer, 'trainable', True)
         else:
             trainable = layer.trainable_by_loss[loss_num]
@@ -711,11 +712,20 @@ class Model(Container):
                     training_updates = self.optimizer.get_updates(trainable_weights, self.constraints, self.loss_list[i])
                     if i == 0:
                         updates = self.updates + training_updates
+                        update_names = []
+                        for tup in updates:
+                            update_names.append(tup[0].auto_name)
                     else:
-                        import pdb; pdb.set_trace()
                         for j in range(len(training_updates)):
-                            training_updates[j][1] = training_updates[j][1] - training_updates[j][0]
-                            # Combine updates into one
+                            idx = [k for k in range(len(updates)) if update_names[k] == training_updates[j][0].auto_name]
+                            if len(idx):
+                                idx = idx[0]
+                                this_update = list(updates[idx])
+                                this_update[1] = this_update[1] + training_updates[j][0] - this_update[1]
+                                updates[idx] = tuple(this_update)
+                            else:
+                                updates.append(training_updates[j])
+                                update_names.append(training_updates[j][0].auto_name)
 
             else:
                 # get trainable weights
@@ -1306,7 +1316,7 @@ class Model(Container):
     def fit_generator(self, generator, samples_per_epoch, nb_epoch,
                       verbose=1, callbacks=[],
                       validation_data=None, nb_val_samples=None,
-                      class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False):
+                      class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False, other_model=None):
         '''Fits the model on data generated batch-by-batch by
         a Python generator.
         The generator is run in parallel to the model, for efficiency.
@@ -1395,6 +1405,8 @@ class Model(Container):
         else:
             callback_model = self
         callbacks._set_model(callback_model)
+        if other_model is not None:
+            callbacks._set_other_model(other_model)
         callbacks._set_params({
             'nb_epoch': nb_epoch,
             'nb_sample': samples_per_epoch,
@@ -1442,6 +1454,7 @@ class Model(Container):
                     raise Exception('output of generator should be a tuple '
                                     '(x, y, sample_weight) '
                                     'or (x, y). Found: ' + str(generator_output))
+
                 if len(generator_output) == 2:
                     x, y = generator_output
                     sample_weight = None
@@ -1452,6 +1465,11 @@ class Model(Container):
                     raise Exception('output of generator should be a tuple '
                                     '(x, y, sample_weight) '
                                     'or (x, y). Found: ' + str(generator_output))
+
+                if other_model is not None:
+                    y = y[0]
+                    y2 = y[1]
+
                 # build batch logs
                 batch_logs = {}
                 if type(x) is list:
@@ -1468,6 +1486,11 @@ class Model(Container):
                     outs = self.train_on_batch(x, y,
                                                sample_weight=sample_weight,
                                                class_weight=class_weight)
+
+                    if other_model is not None:
+                        other_model.train_on_batch(x, y2,
+                                                   sample_weight=sample_weight,
+                                                   class_weight=class_weight)
                 except:
                     _stop.set()
                     raise
@@ -1576,6 +1599,9 @@ class Model(Container):
                 raise Exception('output of generator should be a tuple '
                                 '(x, y, sample_weight) '
                                 'or (x, y). Found: ' + str(generator_output))
+            if isinstance(y, tuple):
+                y = y[0]
+
             try:
                 outs = self.test_on_batch(x, y, sample_weight=sample_weight)
             except:
