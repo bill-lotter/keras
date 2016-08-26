@@ -8,14 +8,17 @@ from ..utils.np_utils import conv_output_length
 
 
 class LocallyConnected1D(Layer):
-    '''LocallyConnected1D layer works almost the same as Convolution1D layer,
-    except that weights are unshared, that is, a different set of filters is
-    applied at each different patch of the input. When using this layer as the
-    first layer in a model, either provide the keyword argument `input_dim`
+    '''The `LocallyConnected1D` layer works similarly to
+    the `Convolution1D` layer, except that weights are unshared,
+    that is, a different set of filters is applied at each different patch
+    of the input.
+    When using this layer as the first layer in a model,
+    either provide the keyword argument `input_dim`
     (int, e.g. 128 for sequences of 128-dimensional vectors), or `input_shape`
-    (tuple of integers, e.g. (10, 128) for sequences of 10 vectors of
-    128-dimensional vectors). Also, you will need to fix shape of the previous
-    layer, since the weights can only be defined with determined output shape.
+    (tuple of integers, e.g. `input_shape=(10, 128)`
+    for sequences of 10 vectors of 128-dimensional vectors).
+    Also, note that this layer can only be used with
+    a fully-specified input shape (`None` dimensions not allowed).
 
     # Example
     ```python
@@ -75,7 +78,7 @@ class LocallyConnected1D(Layer):
                  W_constraint=None, b_constraint=None,
                  bias=True, input_dim=None, input_length=None, **kwargs):
         if border_mode != 'valid':
-            raise Exception('Invalid border mode for Convolution2D '
+            raise Exception('Invalid border mode for LocallyConnected1D '
                             '(only "valid" is supported):', border_mode)
         self.nb_filter = nb_filter
         self.filter_length = filter_length
@@ -180,14 +183,16 @@ class LocallyConnected1D(Layer):
 
 
 class LocallyConnected2D(Layer):
-    '''LocallyConnected2D layer works almost the same as Convolution2D layer,
-    except that weights are unshared, that is, a different set of filters is
-    applied at each different patch of the input. When using this layer as the
+    '''The `LocallyConnected2D` layer works similarly
+    to the `Convolution2D` layer, except that weights are unshared,
+    that is, a different set of filters is applied at each
+    different patch of the input.
+    When using this layer as the
     first layer in a model, provide the keyword argument `input_shape` (tuple
     of integers, does not include the sample axis), e.g.
-    `input_shape=(3, 128, 128)` for 128x128 RGB pictures. Also, you will need
-    to fix shape of the previous layer, since the weights can only be defined
-    with determined output shape.
+    `input_shape=(3, 128, 128)` for 128x128 RGB pictures.
+    Also, note that this layer can only be used with
+    a fully-specified input shape (`None` dimensions not allowed).
 
     # Examples
     ```python
@@ -251,12 +256,14 @@ class LocallyConnected2D(Layer):
     def __init__(self, nb_filter, nb_row, nb_col,
                  init='glorot_uniform', activation='linear', weights=None,
                  border_mode='valid', subsample=(1, 1),
-                 dim_ordering=K.image_dim_ordering(),
+                 dim_ordering='default',
                  W_regularizer=None, b_regularizer=None, activity_regularizer=None,
                  W_constraint=None, b_constraint=None,
                  bias=True, **kwargs):
+        if dim_ordering == 'default':
+            dim_ordering = K.image_dim_ordering()
         if border_mode != 'valid':
-            raise Exception('Invalid border mode for Convolution2D '
+            raise Exception('Invalid border mode for LocallyConnected2D '
                             '(only "valid" is supported):', border_mode)
         self.nb_filter = nb_filter
         self.nb_row = nb_row
