@@ -234,30 +234,23 @@ def collect_metrics(metrics, output_names):
                         str(metrics))
 
 
-def collect_trainable_weights(layer, loss_num=None):
+def collect_trainable_weights(layer):
     '''Collects all `trainable_weights` attributes,
     excluding any sublayers where `trainable` is set the `False`.
     '''
-    import pdb; pdb.set_trace()
-    if loss_num is not None:
-        if layer.trainable_by_loss is None:
-            trainable = getattr(layer, 'trainable', True)
-        else:
-            trainable = layer.trainable_by_loss[loss_num]
-    else:
-        trainable = getattr(layer, 'trainable', True)
+    trainable = getattr(layer, 'trainable', True)
     if not trainable:
         return []
     weights = []
     if layer.__class__.__name__ == 'Sequential':
         for sublayer in layer.flattened_layers:
-            weights += collect_trainable_weights(sublayer, loss_num)
+            weights += collect_trainable_weights(sublayer)
     elif layer.__class__.__name__ == 'Model':
         for sublayer in layer.layers:
-            weights += collect_trainable_weights(sublayer, loss_num)
+            weights += collect_trainable_weights(sublayer)
     elif layer.__class__.__name__ == 'Graph':
         for sublayer in layer._graph_nodes.values():
-            weights += collect_trainable_weights(sublayer, loss_num)
+            weights += collect_trainable_weights(sublayer)
     else:
         weights += layer.trainable_weights
     # dedupe weights
@@ -463,7 +456,7 @@ def generator_queue(generator, max_q_size=10,
 class Model(Container):
 
     def compile(self, optimizer, loss, metrics=[], loss_weights=None,
-                sample_weight_mode=None, use_trainable_by_loss=False, **kwargs):
+                sample_weight_mode=None, **kwargs):
         '''Configures the model for training.
 
         # Arguments
@@ -492,7 +485,6 @@ class Model(Container):
         self.sample_weight_mode = sample_weight_mode
         self.loss = loss
         self.loss_weights = loss_weights
-        self.use_trainable_by_loss = use_trainable_by_loss
 
         # prepare loss weights
         if loss_weights is None:
@@ -619,8 +611,6 @@ class Model(Container):
 
         # compute total loss
         total_loss = None
-        if self.use_trainable_by_loss:
-            self.loss_list = []
         for i in range(len(self.outputs)):
             y_true = self.targets[i]
             y_pred = self.outputs[i]
@@ -637,8 +627,6 @@ class Model(Container):
                 total_loss = loss_weight * output_loss
             else:
                 total_loss += loss_weight * output_loss
-            if self.use_trainable_by_loss:
-                self.loss_list.append(loss_weight * output_loss)
 
         # add regularization penalties to the loss
         for r in self.regularizers:
@@ -701,23 +689,10 @@ class Model(Container):
             else:
                 inputs = self.inputs + self.targets + self.sample_weights
 
-            if self.use_trainable_by_loss:
-                for i in range(len(self.loss_list)):
-                    trainable_weights = collect_trainable_weights(self, i)
-                    training_updates = self.optimizer.get_updates(trainable_weights, self.constraints, self.loss_list[i])
-                    if i == 0:
-                        updates = self.updates + training_updates
-                    else:
-                        import pdb; pdb.set_trace()
-                        for j in range(len(training_updates)):
-                            training_updates[j][1] = training_updates[j][1] - training_updates[j][0]
-                            # Combine updates into one
-
-            else:
-                # get trainable weights
-                trainable_weights = collect_trainable_weights(self)
-                training_updates = self.optimizer.get_updates(trainable_weights, self.constraints, self.total_loss)
-                updates = self.updates + training_updates
+            # get trainable weights
+            trainable_weights = collect_trainable_weights(self)
+            training_updates = self.optimizer.get_updates(trainable_weights, self.constraints, self.total_loss)
+            updates = self.updates + training_updates
 
             # returns loss and metrics. Updates weights at each call.
             self.train_function = K.function(inputs,
