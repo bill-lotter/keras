@@ -5,8 +5,6 @@ from __future__ import division
 
 import numpy as np
 
-import sys
-import marshal
 import types as python_types
 import warnings
 import copy
@@ -15,6 +13,7 @@ from six.moves import zip
 
 from .. import backend as K
 from ..utils.io_utils import ask_to_proceed_with_overwrite
+from ..utils.generic_utils import func_dump, func_load
 
 
 def to_list(x):
@@ -975,11 +974,11 @@ class InputLayer(Layer):
                              'batch_input_shape argument to '
                              'InputLayer, not both at the same time.')
         if input_tensor is not None:
-            if not input_shape and not batch_input_shape:
-                # attempt automatic input shape inference
-                try:
-                    batch_input_shape = K.int_shape(input_tensor)
-                except:
+            # attempt automatic input shape inference
+            try:
+                batch_input_shape = K.int_shape(input_tensor)
+            except:
+                if not input_shape and not batch_input_shape:
                     raise ValueError('InputLayer was provided an input_tensor argument, '
                                      'but its input shape cannot be automatically inferred. '
                                      'You should pass an input_shape or batch_input_shape '
@@ -1079,6 +1078,7 @@ def Input(shape=None, batch_shape=None,
                        ' or a `batch_shape` argument. Note that ' +
                        '`shape` does not include the batch '
                        'dimension.')
+    if shape and not batch_shape:
         batch_shape = (None,) + tuple(shape)
     input_layer = InputLayer(batch_input_shape=batch_shape,
                              name=name, input_dtype=dtype,
@@ -1233,7 +1233,7 @@ class Merge(Layer):
                 raise Exception('Invalid format for dot_axes - list elements should be "int".')
             if shape1[self.dot_axes[0]] != shape2[self.dot_axes[1]]:
                 raise Exception('Dimension incompatibility using dot mode: ' +
-                                '%s != %s. ' % (shape1[dot_axes[0]], shape2[dot_axes[1]]) +
+                                '%s != %s. ' % (shape1[self.dot_axes[0]], shape2[self.dot_axes[1]]) +
                                 'Layer shapes: %s, %s' % (shape1, shape2))
         elif mode == 'concat':
             reduced_inputs_shapes = [list(shape) for shape in input_shapes]
@@ -1388,7 +1388,7 @@ class Merge(Layer):
             masks = [K.expand_dims(m, 0) for m in mask if m is not None]
             return K.all(K.concatenate(masks, axis=0), axis=0, keepdims=False)
         elif self.mode == 'concat':
-            # Make a list of masks while making sure the dimensionality of each mask 
+            # Make a list of masks while making sure the dimensionality of each mask
             # is the same as the corresponding input.
             masks = []
             for input_i, mask_i in zip(inputs, mask):
@@ -1414,13 +1414,8 @@ class Merge(Layer):
             raise Exception('Invalid merge mode: {}'.format(self.mode))
 
     def get_config(self):
-        py3 = sys.version_info[0] == 3
-
         if isinstance(self.mode, python_types.LambdaType):
-            if py3:
-                mode = marshal.dumps(self.mode.__code__).decode('raw_unicode_escape')
-            else:
-                mode = marshal.dumps(self.mode.func_code).decode('raw_unicode_escape')
+            mode = func_dump(self.mode)
             mode_type = 'lambda'
         elif callable(self.mode):
             mode = self.mode.__name__
@@ -1430,10 +1425,7 @@ class Merge(Layer):
             mode_type = 'raw'
 
         if isinstance(self._output_shape, python_types.LambdaType):
-            if py3:
-                output_shape = marshal.dumps(self._output_shape.__code__).decode('raw_unicode_escape')
-            else:
-                output_shape = marshal.dumps(self._output_shape.func_code).decode('raw_unicode_escape')
+            output_shape = func_dump(self._output_shape)
             output_shape_type = 'lambda'
         elif callable(self._output_shape):
             output_shape = self._output_shape.__name__
@@ -1456,8 +1448,7 @@ class Merge(Layer):
         if mode_type == 'function':
             mode = globals()[config['mode']]
         elif mode_type == 'lambda':
-            mode = marshal.loads(config['mode'].encode('raw_unicode_escape'))
-            mode = python_types.FunctionType(mode, globals())
+            mode = func_load(config['mode'], globs=globals())
         else:
             mode = config['mode']
 
@@ -1465,8 +1456,7 @@ class Merge(Layer):
         if output_shape_type == 'function':
             output_shape = globals()[config['output_shape']]
         elif output_shape_type == 'lambda':
-            output_shape = marshal.loads(config['output_shape'].encode('raw_unicode_escape'))
-            output_shape = python_types.FunctionType(output_shape, globals())
+            output_shape = func_load(config['output_shape'], globs=globals())
         else:
             output_shape = config['output_shape']
 
@@ -1950,7 +1940,7 @@ class Container(Layer):
         cons = {}
         for layer in self.layers:
             for key, value in layer.constraints.items():
-                if key in cons:
+                if key in cons and cons[key] != value:
                     raise Exception('Received multiple constraints '
                                     'for one weight tensor: ' + str(key))
                 cons[key] = value
@@ -2479,14 +2469,30 @@ class Container(Layer):
                 else:
                     param_dset[:] = val
 
-    def load_weights(self, filepath):
+    def load_weights(self, filepath, by_name=False):
         '''Load all layer weights from a HDF5 save file.
+
+        If `by_name` is False (default) weights are loaded
+        based on the network's topology, meaning the architecture
+        should be the same as when the weights were saved.
+        Note that layers that don't have weights are not taken
+        into account in the topological ordering, so adding or
+        removing layers is fine as long as they don't have weights.
+
+        If `by_name` is True, weights are loaded into layers
+        only if they share the same name. This is useful
+        for fine-tuning or transfer-learning models where
+        some of the layers have changed.
         '''
         import h5py
         f = h5py.File(filepath, mode='r')
         if 'layer_names' not in f.attrs and 'model_weights' in f:
             f = f['model_weights']
-        self.load_weights_from_hdf5_group(f)
+        if by_name:
+            self.load_weights_from_hdf5_group_by_name(f)
+        else:
+            self.load_weights_from_hdf5_group(f)
+
         if hasattr(f, 'close'):
             f.close()
 
@@ -2560,6 +2566,54 @@ class Container(Layer):
                                     str(len(weight_values)) +
                                     ' elements.')
                 weight_value_tuples += zip(symbolic_weights, weight_values)
+            K.batch_set_value(weight_value_tuples)
+
+    def load_weights_from_hdf5_group_by_name(self, f):
+        ''' Name-based weight loading
+        (instead of topological weight loading).
+        Layers that have no matching name are skipped.
+        '''
+        if hasattr(self, 'flattened_layers'):
+            # support for legacy Sequential/Merge behavior
+            flattened_layers = self.flattened_layers
+        else:
+            flattened_layers = self.layers
+
+        if 'nb_layers' in f.attrs:
+                raise Exception('The weight file you are trying to load is' +
+                                ' in a legacy format that does not support' +
+                                ' name-based weight loading.')
+        else:
+            # new file format
+            layer_names = [n.decode('utf8') for n in f.attrs['layer_names']]
+
+            # Reverse index of layer name to list of layers with name.
+            index = {}
+            for layer in flattened_layers:
+                if layer.name:
+                    index.setdefault(layer.name, []).append(layer)
+
+            # we batch weight value assignments in a single backend call
+            # which provides a speedup in TensorFlow.
+            weight_value_tuples = []
+            for k, name in enumerate(layer_names):
+                g = f[name]
+                weight_names = [n.decode('utf8') for n in g.attrs['weight_names']]
+                weight_values = [g[weight_name] for weight_name in weight_names]
+
+                for layer in index.get(name, []):
+                    symbolic_weights = layer.weights
+                    if len(weight_values) != len(symbolic_weights):
+                        raise Exception('Layer #' + str(k) +
+                                        ' (named "' + layer.name +
+                                        '") expects ' +
+                                        str(len(symbolic_weights)) +
+                                        ' weight(s), but the saved weights' +
+                                        ' have ' + str(len(weight_values)) +
+                                        ' element(s).')
+                    # set values
+                    for i in range(len(weight_values)):
+                        weight_value_tuples.append((symbolic_weights[i], weight_values[i]))
             K.batch_set_value(weight_value_tuples)
 
     def _updated_config(self):
