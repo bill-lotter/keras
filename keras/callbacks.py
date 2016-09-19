@@ -28,6 +28,10 @@ class CallbackList(object):
         for callback in self.callbacks:
             callback._set_model(model)
 
+    def _set_other_model(self, model):
+        for callback in self.callbacks:
+            callback._set_other_model(model)
+
     def on_epoch_begin(self, epoch, logs={}):
         for callback in self.callbacks:
             callback.on_epoch_begin(epoch, logs)
@@ -109,6 +113,9 @@ class Callback(object):
 
     def _set_model(self, model):
         self.model = model
+
+    def _set_other_model(self, model):
+        self.other_model = model
 
     def on_epoch_begin(self, epoch, logs={}):
         pass
@@ -247,11 +254,14 @@ class ModelCheckpoint(Callback):
     '''
     def __init__(self, filepath, monitor='val_loss', verbose=0,
                  save_best_only=False, save_weights_only=False,
-                 mode='auto'):
+                 mode='auto', filepath2=None):
         super(ModelCheckpoint, self).__init__()
         self.monitor = monitor
         self.verbose = verbose
         self.filepath = filepath
+        if filepath2 is None:
+            filepath2 = filepath[:filepath.rfind('.')] + '_other_model' + filepath[filepath.rfind('.'):]
+            self.filepath2 = filepath2
         self.save_best_only = save_best_only
         self.save_weights_only = save_weights_only
 
@@ -277,6 +287,7 @@ class ModelCheckpoint(Callback):
 
     def on_epoch_end(self, epoch, logs={}):
         filepath = self.filepath.format(epoch=epoch, **logs)
+        filepath2 = self.filepath2.format(epoch=epoch, **logs)
         if self.save_best_only:
             current = logs.get(self.monitor)
             if current is None:
@@ -292,8 +303,12 @@ class ModelCheckpoint(Callback):
                     self.best = current
                     if self.save_weights_only:
                         self.model.save_weights(filepath, overwrite=True)
+                        if hasattr(self, 'other_model'):
+                            self.other_model.save_weights(filepath2, overwrite=True)
                     else:
                         self.model.save(filepath, overwrite=True)
+                        if hasattr(self, 'other_model'):
+                            self.other_model.save(filepath2, overwrite=True)
                 else:
                     if self.verbose > 0:
                         print('Epoch %05d: %s did not improve' %
@@ -303,8 +318,12 @@ class ModelCheckpoint(Callback):
                 print('Epoch %05d: saving model to %s' % (epoch, filepath))
             if self.save_weights_only:
                 self.model.save_weights(filepath, overwrite=True)
+                if hasattr(self, 'other_model'):
+                    self.other_model.save_weights(filepath2, overwrite=True)
             else:
                 self.model.save(filepath, overwrite=True)
+                if hasattr(self, 'other_model'):
+                    self.other_model.save(filepath2, overwrite=True)
 
 
 class EarlyStopping(Callback):

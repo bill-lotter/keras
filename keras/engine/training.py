@@ -1277,7 +1277,7 @@ class Model(Container):
     def fit_generator(self, generator, samples_per_epoch, nb_epoch,
                       verbose=1, callbacks=[],
                       validation_data=None, nb_val_samples=None,
-                      class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False):
+                      class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False, other_model=None):
         '''Fits the model on data generated batch-by-batch by
         a Python generator.
         The generator is run in parallel to the model, for efficiency.
@@ -1366,6 +1366,8 @@ class Model(Container):
         else:
             callback_model = self
         callbacks._set_model(callback_model)
+        if other_model is not None:
+            callbacks._set_other_model(other_model)
         callbacks._set_params({
             'nb_epoch': nb_epoch,
             'nb_sample': samples_per_epoch,
@@ -1423,6 +1425,11 @@ class Model(Container):
                     raise Exception('output of generator should be a tuple '
                                     '(x, y, sample_weight) '
                                     'or (x, y). Found: ' + str(generator_output))
+
+                if other_model is not None:
+                    y = y[0]
+                    y2 = y[1]
+
                 # build batch logs
                 batch_logs = {}
                 if type(x) is list:
@@ -1439,6 +1446,10 @@ class Model(Container):
                     outs = self.train_on_batch(x, y,
                                                sample_weight=sample_weight,
                                                class_weight=class_weight)
+                    if other_model is not None:
+                        other_model.train_on_batch(x, y2,
+                                                   sample_weight=sample_weight,
+                                                   class_weight=class_weight)
                 except:
                     _stop.set()
                     raise
@@ -1548,6 +1559,8 @@ class Model(Container):
                 raise Exception('output of generator should be a tuple '
                                 '(x, y, sample_weight) '
                                 'or (x, y). Found: ' + str(generator_output))
+            if isinstance(y, tuple):
+                y = y[0]
             try:
                 outs = self.test_on_batch(x, y, sample_weight=sample_weight)
             except:
