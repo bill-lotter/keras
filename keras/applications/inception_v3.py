@@ -60,7 +60,7 @@ def conv2d_bn(x, nb_filter, nb_row, nb_col,
 
 
 def InceptionV3(include_top=True, weights='imagenet',
-                input_tensor=None):
+                input_tensor=None, avg_pool_size=8, n_classes=1000):
     '''Instantiate the Inception v3 architecture,
     optionally loading weights pre-trained
     on ImageNet. Note that when using TensorFlow,
@@ -257,9 +257,12 @@ def InceptionV3(include_top=True, weights='imagenet',
 
     if include_top:
         # Classification block
-        x = AveragePooling2D((8, 8), strides=(8, 8), name='avg_pool')(x)
+        x = AveragePooling2D((avg_pool_size, avg_pool_size), strides=(avg_pool_size, avg_pool_size), name='avg_pool')(x)
         x = Flatten(name='flatten')(x)
-        x = Dense(1000, activation='softmax', name='predictions')(x)
+        if n_classes == 1:
+            x = Dense(n_classes, activation='hard_sigmoid', name='predictions')(x)
+        else:
+            x = Dense(n_classes, activation='softmax', name='predictions')(x)
 
     # Create model
     model = Model(img_input, x)

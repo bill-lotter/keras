@@ -14,13 +14,14 @@ import warnings
 
 from ..layers import merge, Input
 from ..layers import Dense, Activation, Flatten
-from ..layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D
+from ..layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, GlobalAveragePooling2D
 from ..layers import BatchNormalization
 from ..models import Model
 from .. import backend as K
 from ..utils.layer_utils import convert_all_kernels_in_model
 from ..utils.data_utils import get_file
 from .imagenet_utils import decode_predictions, preprocess_input
+from ..regularizers import l2
 
 
 TH_WEIGHTS_PATH = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.2/resnet50_weights_th_dim_ordering_th_kernels.h5'
@@ -29,7 +30,7 @@ TH_WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/relea
 TF_WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.2/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5'
 
 
-def identity_block(input_tensor, kernel_size, filters, stage, block):
+def identity_block(input_tensor, kernel_size, filters, stage, block, W_regularizer=None):
     '''The identity_block is the block that has no conv layer at shortcut
 
     # Arguments
@@ -47,16 +48,16 @@ def identity_block(input_tensor, kernel_size, filters, stage, block):
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    x = Convolution2D(nb_filter1, 1, 1, name=conv_name_base + '2a')(input_tensor)
+    x = Convolution2D(nb_filter1, 1, 1, name=conv_name_base + '2a', W_regularizer=W_regularizer)(input_tensor)
     x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
     x = Activation('relu')(x)
 
     x = Convolution2D(nb_filter2, kernel_size, kernel_size,
-                      border_mode='same', name=conv_name_base + '2b')(x)
+                      border_mode='same', name=conv_name_base + '2b', W_regularizer=W_regularizer)(x)
     x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
     x = Activation('relu')(x)
 
-    x = Convolution2D(nb_filter3, 1, 1, name=conv_name_base + '2c')(x)
+    x = Convolution2D(nb_filter3, 1, 1, name=conv_name_base + '2c', W_regularizer=W_regularizer)(x)
     x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
 
     x = merge([x, input_tensor], mode='sum')
@@ -64,7 +65,7 @@ def identity_block(input_tensor, kernel_size, filters, stage, block):
     return x
 
 
-def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2)):
+def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2), W_regularizer=None):
     '''conv_block is the block that has a conv layer at shortcut
 
     # Arguments
@@ -86,20 +87,20 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
     x = Convolution2D(nb_filter1, 1, 1, subsample=strides,
-                      name=conv_name_base + '2a')(input_tensor)
+                      name=conv_name_base + '2a', W_regularizer=W_regularizer)(input_tensor)
     x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
     x = Activation('relu')(x)
 
     x = Convolution2D(nb_filter2, kernel_size, kernel_size, border_mode='same',
-                      name=conv_name_base + '2b')(x)
+                      name=conv_name_base + '2b', W_regularizer=W_regularizer)(x)
     x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
     x = Activation('relu')(x)
 
-    x = Convolution2D(nb_filter3, 1, 1, name=conv_name_base + '2c')(x)
+    x = Convolution2D(nb_filter3, 1, 1, name=conv_name_base + '2c', W_regularizer=W_regularizer)(x)
     x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
 
     shortcut = Convolution2D(nb_filter3, 1, 1, subsample=strides,
-                             name=conv_name_base + '1')(input_tensor)
+                             name=conv_name_base + '1', W_regularizer=W_regularizer)(input_tensor)
     shortcut = BatchNormalization(axis=bn_axis, name=bn_name_base + '1')(shortcut)
 
     x = merge([x, shortcut], mode='sum')
@@ -108,7 +109,7 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
 
 
 def ResNet50(include_top=True, weights='imagenet',
-             input_tensor=None):
+             input_tensor=None, weight_reg=False, n_classes=1000):
     '''Instantiate the ResNet50 architecture,
     optionally loading weights pre-trained
     on ImageNet. Note that when using TensorFlow,
@@ -160,37 +161,43 @@ def ResNet50(include_top=True, weights='imagenet',
     else:
         bn_axis = 1
 
+    W_reg = l2(0.0001) if weight_reg else None
+
     x = ZeroPadding2D((3, 3))(img_input)
-    x = Convolution2D(64, 7, 7, subsample=(2, 2), name='conv1')(x)
+    x = Convolution2D(64, 7, 7, subsample=(2, 2), name='conv1', W_regularizer=W_reg)(x)
     x = BatchNormalization(axis=bn_axis, name='bn_conv1')(x)
     x = Activation('relu')(x)
     x = MaxPooling2D((3, 3), strides=(2, 2))(x)
 
-    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
-    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
+    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1), W_regularizer=W_reg)
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='b', W_regularizer=W_reg)
+    x = identity_block(x, 3, [64, 64, 256], stage=2, block='c', W_regularizer=W_reg)
 
-    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
-    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
+    x = conv_block(x, 3, [128, 128, 512], stage=3, block='a', W_regularizer=W_reg)
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='b', W_regularizer=W_reg)
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='c', W_regularizer=W_reg)
+    x = identity_block(x, 3, [128, 128, 512], stage=3, block='d', W_regularizer=W_reg)
 
-    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e')
-    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f')
+    x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a', W_regularizer=W_reg)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b', W_regularizer=W_reg)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c', W_regularizer=W_reg)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d', W_regularizer=W_reg)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e', W_regularizer=W_reg)
+    x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f', W_regularizer=W_reg)
 
-    x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b')
-    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c')
+    x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a', W_regularizer=W_reg)
+    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b', W_regularizer=W_reg)
+    x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c', W_regularizer=W_reg)
 
-    x = AveragePooling2D((7, 7), name='avg_pool')(x)
+    #x = AveragePooling2D((7, 7), name='avg_pool')(x)
+    x = GlobalAveragePooling2D(name='avg_pool')(x)
 
     if include_top:
-        x = Flatten()(x)
-        x = Dense(1000, activation='softmax', name='fc1000')(x)
+        #x = Flatten()(x)
+        if n_classes==1:
+            x = Dense(1, activation='hard_sigmoid', name='fc1000')(x)
+        else:
+            x = Dense(n_classes, activation='softmax', name='fc1000')(x)
 
     model = Model(img_input, x)
 
