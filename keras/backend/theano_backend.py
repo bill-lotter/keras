@@ -686,7 +686,7 @@ def function(inputs, outputs, updates=[], **kwargs):
 
 
 def gradients(loss, variables):
-    return T.grad(loss, variables)
+    return T.grad(loss, variables, disconnected_inputs='warn')
 
 
 def stop_gradient(variables):
