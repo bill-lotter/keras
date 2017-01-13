@@ -79,8 +79,9 @@ class TimeDistributed(Wrapper):
     # Arguments
         layer: a layer instance.
     """
-    def __init__(self, layer, **kwargs):
+    def __init__(self, layer, use_RNN_implementation=False, **kwargs):
         self.supports_masking = True
+        self.use_RNN_implementation = use_RNN_implementation
         super(TimeDistributed, self).__init__(layer, **kwargs)
 
     def build(self, input_shape):
@@ -111,7 +112,14 @@ class TimeDistributed(Wrapper):
 
     def call(self, X, mask=None):
         input_shape = self.input_spec[0].shape
-        if input_shape[0]:
+        if self.use_RNN_implementation:
+            use_RNN = True
+        else:
+            if input_shape[0]:
+                use_RNN = True
+            else:
+                use_RNN = False
+        if use_RNN:
             # batch size matters, use rnn-based implementation
             def step(x, states):
                 output = self.layer.call(x)
