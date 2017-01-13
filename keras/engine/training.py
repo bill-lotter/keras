@@ -1591,7 +1591,7 @@ class Model(Container):
                                            weights=weights))
             return averages
 
-    def predict_generator(self, generator, val_samples, max_q_size=10, nb_worker=1, pickle_safe=False):
+    def predict_generator(self, generator, val_samples, max_q_size=10, nb_worker=1, pickle_safe=False, include_y_true=False):
         '''Generates predictions for the input samples from a data generator.
         The generator should return the same kind of data as accepted by
         `predict_on_batch`.
@@ -1615,6 +1615,7 @@ class Model(Container):
         processed_samples = 0
         wait_time = 0.01
         all_outs = []
+        all_y = []
         data_gen_queue, _stop = generator_queue(generator, max_q_size=max_q_size, nb_worker=nb_worker,
                                                 pickle_safe=pickle_safe)
 
@@ -1665,11 +1666,26 @@ class Model(Container):
             for i, out in enumerate(outs):
                 all_outs[i][processed_samples:(processed_samples + nb_samples)] = out
 
+            if include_y_true:
+                if type(y) != list:
+                    y = [y]
+                if len(all_y) == 0:
+                    for out in y:
+                        shape = (val_samples,) + out.shape[1:]
+                        all_y.append(np.zeros(shape, dtype=K.floatx()))
+                for i, out in enumerate(y):
+                    all_y[i][processed_samples:(processed_samples + nb_samples)] = out
+
             processed_samples += nb_samples
 
         _stop.set()
         if pickle_safe:
             data_gen_queue.close()
         if len(all_outs) == 1:
-            return all_outs[0]
-        return all_outs
+            all_outs = all_outs[0]
+        if include_y_true:
+            if len(all_y) == 1:
+                all_y = all_y[0]
+            return all_outs, all_y
+        else:
+            return all_outs
