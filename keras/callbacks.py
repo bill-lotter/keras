@@ -262,6 +262,8 @@ class ModelCheckpoint(Callback):
         if filepath2 is None:
             filepath2 = filepath[:filepath.rfind('.')] + '_other_model' + filepath[filepath.rfind('.'):]
             self.filepath2 = filepath2
+        else:
+            self.filepath2 = filepath2
         self.save_best_only = save_best_only
         self.save_weights_only = save_weights_only
 
