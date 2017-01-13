@@ -109,7 +109,7 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2),
 
 
 def ResNet50(include_top=True, weights='imagenet',
-             input_tensor=None, weight_reg=False, n_classes=1000):
+             input_tensor=None, weight_reg=False, n_classes=1000, init_filt_size=7, no_final_act=False):
     '''Instantiate the ResNet50 architecture,
     optionally loading weights pre-trained
     on ImageNet. Note that when using TensorFlow,
@@ -164,7 +164,7 @@ def ResNet50(include_top=True, weights='imagenet',
     W_reg = l2(0.0001) if weight_reg else None
 
     x = ZeroPadding2D((3, 3))(img_input)
-    x = Convolution2D(64, 7, 7, subsample=(2, 2), name='conv1', W_regularizer=W_reg)(x)
+    x = Convolution2D(64, init_filt_size, init_filt_size, subsample=(2, 2), name='conv1', W_regularizer=W_reg)(x)
     x = BatchNormalization(axis=bn_axis, name='bn_conv1')(x)
     x = Activation('relu')(x)
     x = MaxPooling2D((3, 3), strides=(2, 2))(x)
@@ -195,8 +195,10 @@ def ResNet50(include_top=True, weights='imagenet',
     if include_top:
         #x = Flatten()(x)
         if n_classes==1:
-            x = Dense(1, activation='hard_sigmoid', name='fc1000')(x)
+            act = None if no_final_act else 'hard_sigmoid'
+            x = Dense(1, activation=act, name='fc1000')(x)
         else:
+            act = None if no_final_act else 'softmax'
             x = Dense(n_classes, activation='softmax', name='fc1000')(x)
 
     model = Model(img_input, x)
