@@ -85,7 +85,6 @@ class TimeDistributed(Wrapper):
 
     def __init__(self, layer, **kwargs):
         self.supports_masking = True
-        self.use_RNN_implementation = use_RNN_implementation
         super(TimeDistributed, self).__init__(layer, **kwargs)
 
     def build(self, input_shape):

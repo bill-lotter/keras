@@ -1516,10 +1516,6 @@ class Model(Container):
                     outs = self.train_on_batch(x, y,
                                                sample_weight=sample_weight,
                                                class_weight=class_weight)
-                    if other_model is not None:
-                        other_model.train_on_batch(x, y2,
-                                                   sample_weight=sample_weight,
-                                                   class_weight=class_weight)
                 except:
                     _stop.set()
                     raise

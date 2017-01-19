@@ -323,11 +323,6 @@ class ModelCheckpoint(Callback):
         self.monitor = monitor
         self.verbose = verbose
         self.filepath = filepath
-        if filepath2 is None:
-            filepath2 = filepath[:filepath.rfind('.')] + '_other_model' + filepath[filepath.rfind('.'):]
-            self.filepath2 = filepath2
-        else:
-            self.filepath2 = filepath2
         self.save_best_only = save_best_only
         self.save_weights_only = save_weights_only
         self.period = period
