@@ -450,7 +450,7 @@ def generator_queue(generator, max_q_size=10,
 class Model(Container):
 
     def compile(self, optimizer, loss, metrics=None, loss_weights=None,
-                sample_weight_mode=None, **kwargs):
+                sample_weight_mode=None, use_trainable_by_loss=False, **kwargs):
         """Configures the model for training.
 
         # Arguments
@@ -479,6 +479,7 @@ class Model(Container):
         self.sample_weight_mode = sample_weight_mode
         self.loss = loss
         self.loss_weights = loss_weights
+        self.use_trainable_by_loss = use_trainable_by_loss
 
         # prepare loss weights
         if loss_weights is None:
@@ -617,6 +618,8 @@ class Model(Container):
 
         # compute total loss
         total_loss = None
+        if self.use_trainable_by_loss:
+            self.loss_list = []
         for i in range(len(self.outputs)):
             y_true = self.targets[i]
             y_pred = self.outputs[i]
@@ -633,6 +636,8 @@ class Model(Container):
                 total_loss = loss_weight * output_loss
             else:
                 total_loss += loss_weight * output_loss
+            if self.use_trainable_by_loss:
+                self.loss_list.append(loss_weight * output_loss)
 
         # add regularization penalties
         # and other layer-specific losses
@@ -699,14 +704,26 @@ class Model(Container):
         self.predict_function = None
 
         # collected trainable weights and sort them deterministically.
-        trainable_weights = self.trainable_weights
-        # Sort weights by name
-        if trainable_weights:
-            if K.backend() == 'theano':
-                trainable_weights.sort(key=lambda x: x.name if x.name else x.auto_name)
-            else:
-                trainable_weights.sort(key=lambda x: x.name)
-        self._collected_trainable_weights = trainable_weights
+        if self.use_trainable_by_loss:
+            self._collected_trainable_weights_by_loss = []
+            for k in range(len(self.loss_list)):
+                trainable_weights = self.trainable_weights_by_loss(k)
+                # Sort weights by name
+                if trainable_weights:
+                    if K.backend() == 'theano':
+                        trainable_weights.sort(key=lambda x: x.name if x.name else x.auto_name)
+                    else:
+                        trainable_weights.sort(key=lambda x: x.name)
+                self._collected_trainable_weights_by_loss.append(trainable_weights)
+        else:
+            trainable_weights = self.trainable_weights
+            # Sort weights by name
+            if trainable_weights:
+                if K.backend() == 'theano':
+                    trainable_weights.sort(key=lambda x: x.name if x.name else x.auto_name)
+                else:
+                    trainable_weights.sort(key=lambda x: x.name)
+            self._collected_trainable_weights = trainable_weights
 
     def _make_train_function(self):
         if not hasattr(self, 'train_function'):
@@ -716,10 +733,36 @@ class Model(Container):
                 inputs = self.inputs + self.targets + self.sample_weights + [K.learning_phase()]
             else:
                 inputs = self.inputs + self.targets + self.sample_weights
+            import pdb
+            if self.use_trainable_by_loss:
+                for k in range(len(self.loss_list)):
+                    training_updates = self.optimizer.get_updates(self._collected_trainable_weights_by_loss[k],
+                                                                  self.constraints,
+                                                                  self.loss_list[k])
 
-            training_updates = self.optimizer.get_updates(self._collected_trainable_weights,
-                                                          self.constraints,
-                                                          self.total_loss)
+                    if k == 0:
+                        updates = self.updates + training_updates
+                        update_names = []
+                        for tup in updates:
+                            update_names.append(tup[0].name)
+                        pdb.set_trace()
+                    else:
+                        pdb.set_trace()
+                        for j in range(len(training_updates)):
+                            idx = [k for k in range(len(updates)) if update_names[k] == training_updates[j][0].auto_name]
+                            if len(idx):
+                                idx = idx[0]
+                                this_update = list(updates[idx])
+                                this_update[1] = this_update[1] + training_updates[j]
+                                updates[idx] = tuple(this_update)
+                            else:
+                                updates.append(training_updates[j])
+                                update_names.append(training_updates[j][0].auto_name)
+
+            else:
+                training_updates = self.optimizer.get_updates(self._collected_trainable_weights,
+                                                              self.constraints,
+                                                              self.total_loss)
             updates = self.updates + training_updates
 
             # returns loss and metrics. Updates weights at each call.

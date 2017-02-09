@@ -320,7 +320,8 @@ class Layer(object):
                           'batch_input_shape',
                           'input_dtype',
                           'name',
-                          'trainable'}
+                          'trainable',
+                          'trainable_by_loss'}
         for kwarg in kwargs.keys():
             if kwarg not in allowed_kwargs:
                 raise TypeError('Keyword argument not understood:', kwarg)
@@ -331,6 +332,7 @@ class Layer(object):
         self.name = name
 
         self.trainable = kwargs.get('trainable', True)
+        self.trainable_by_loss = kwargs.get('trainable_by_loss', None)
         if 'batch_input_shape' in kwargs or 'input_shape' in kwargs:
             # In this case we will create an input layer
             # to insert before the current layer
@@ -1004,7 +1006,8 @@ class Layer(object):
         by Container (one layer of abstraction above).
         """
         config = {'name': self.name,
-                  'trainable': self.trainable}
+                  'trainable': self.trainable,
+                  'trainable_by_loss': self.trainable_by_loss}
         if hasattr(self, 'batch_input_shape'):
             config['batch_input_shape'] = self.batch_input_shape
         if hasattr(self, 'input_dtype'):
@@ -1062,6 +1065,7 @@ class InputLayer(Layer):
         self.supports_masking = False
         self.uses_learning_phase = False
         self.trainable = False
+        self.trainable_by_loss = None
         self.built = True
         self._trainable_weights = []
         self._non_trainable_weights = []
@@ -2158,6 +2162,16 @@ class Container(Layer):
         weights = []
         for layer in self.layers:
             weights += layer.trainable_weights
+        return weights
+
+    def trainable_weights_by_loss(self, loss_num=None):
+        if not self.trainable:
+            return []
+        weights = []
+
+        for layer in self.layers:
+            if loss_num is None or layer.trainable_by_loss is None or layer.trainable_by_loss[loss_num]:
+                weights += layer.trainable_weights
         return weights
 
     @property
