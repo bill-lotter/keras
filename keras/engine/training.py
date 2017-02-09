@@ -1341,7 +1341,7 @@ class Model(Container):
                       validation_data=None, nb_val_samples=None,
                       class_weight=None,
                       max_q_size=10, nb_worker=1, pickle_safe=False,
-                      initial_epoch=0):
+                      initial_epoch=0, use_auc=False):
         """Fits the model on data generated batch-by-batch by
         a Python generator.
         The generator is run in parallel to the model, for efficiency.
@@ -1470,6 +1470,8 @@ class Model(Container):
             pickle_safe=pickle_safe)
 
         callback_model.stop_training = False
+        if use_auc:
+            from sklearn.metrics import roc_auc_score
         while epoch < nb_epoch:
             callbacks.on_epoch_begin(epoch)
             samples_seen = 0
@@ -1541,20 +1543,35 @@ class Model(Container):
                                   'to avoid this warning.')
                 if samples_seen >= samples_per_epoch and do_validation:
                     if val_gen:
-                        val_outs = self.evaluate_generator(
-                            validation_data,
-                            nb_val_samples,
-                            max_q_size=max_q_size,
-                            nb_worker=nb_worker,
-                            pickle_safe=pickle_safe)
+                        if use_auc:
+                            y_hat, y_val = self.predict_generator(
+                                validation_data,
+                                nb_val_samples,
+                                max_q_size=max_q_size,
+                                nb_worker=nb_worker,
+                                pickle_safe=pickle_safe,
+                                include_y_true=True)
+                            val_outs = -1 * roc_auc_score(y_val, y_hat)
+                        else:
+                            val_outs = self.evaluate_generator(
+                                validation_data,
+                                nb_val_samples,
+                                max_q_size=max_q_size,
+                                nb_worker=nb_worker,
+                                pickle_safe=pickle_safe)
                     else:
                         # no need for try/except because
                         # data has already been validated
-                        val_outs = self.evaluate(
-                            val_x, val_y,
-                            batch_size=batch_size,
-                            sample_weight=val_sample_weights,
-                            verbose=0)
+                        if use_auc:
+                            y_hat = self.predict(val_x,
+                                batch_size=batch_size,
+                                verbose=0)
+                            val_outs = -1 * roc_auc_score(val_y[0], y_hat)
+                        else:
+                            val_outs = self.evaluate(
+                                val_x, val_y,
+                                batch_size=batch_size,
+                                verbose=0)
                     if not isinstance(val_outs, list):
                         val_outs = [val_outs]
                     # same labels assumed
@@ -1676,7 +1693,7 @@ class Model(Container):
             return averages
 
     def predict_generator(self, generator, val_samples,
-                          max_q_size=10, nb_worker=1, pickle_safe=False):
+                          max_q_size=10, nb_worker=1, pickle_safe=False, include_y_true=False):
         """Generates predictions for the input samples from a data generator.
         The generator should return the same kind of data as accepted by
         `predict_on_batch`.
@@ -1704,6 +1721,7 @@ class Model(Container):
         processed_samples = 0
         wait_time = 0.01
         all_outs = []
+        all_y = []
         data_gen_queue, _stop, generator_threads = generator_queue(
             generator,
             max_q_size=max_q_size,
@@ -1757,6 +1775,17 @@ class Model(Container):
 
             for i, out in enumerate(outs):
                 all_outs[i][processed_samples:(processed_samples + nb_samples)] = out
+
+            if include_y_true:
+                if type(y) != list:
+                    y = [y]
+                if len(all_y) == 0:
+                    for out in y:
+                        shape = (val_samples,) + out.shape[1:]
+                        all_y.append(np.zeros(shape, dtype=K.floatx()))
+                for i, out in enumerate(y):
+                    all_y[i][processed_samples:(processed_samples + nb_samples)] = out
+
             processed_samples += nb_samples
 
         _stop.set()
