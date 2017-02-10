@@ -644,6 +644,7 @@ class Model(Container):
         # add regularization penalties
         # and other layer-specific losses
         for loss_tensor in self.losses:
+            pdb.set_trace()
             total_loss += loss_tensor
 
         # list of same size as output_names.
@@ -723,39 +724,13 @@ class Model(Container):
                 inputs = self.inputs + self.targets + self.sample_weights + [K.learning_phase()]
             else:
                 inputs = self.inputs + self.targets + self.sample_weights
-            import pdb
             if self.use_trainable_by_loss:
-                for loss_num in range(len(self.loss_list)):
-                    loss_training_updates = self.optimizer.get_updates(self._collected_trainable_weights,
-                                                                  self.constraints,
-                                                                  self.loss_list[loss_num])
-                    loss_update_names = []
-                    for tup in loss_training_updates:
-                        loss_update_names.append(tup[0].name)
-                    keep_idx = [j for j in range(len(loss_update_names)) if loss_update_names[j] not in self.trainable_exclude_list[loss_num]]
-                    loss_training_updates = [loss_training_updates[j] for j in keep_idx]
-
-                    if loss_num == 0:
-                        training_updates = loss_training_updates
-                    else:
-                        training_update_names = []
-                        for tup in training_updates:
-                            training_update_names.append(tup[0].auto_name)
-                        for j in range(len(loss_training_updates)):
-                            idx = [k for k in range(len(training_updates)) if training_update_names[k] == loss_training_updates[j][0].auto_name]
-                            if len(idx):
-                                idx = idx[0]
-                                this_update = list(training_updates[idx])
-                                this_update[1] = this_update[1] + loss_training_updates[j][1]
-                                training_updates[idx] = tuple(this_update)
-                            else:
-                                training_updates.append(loss_training_updates[j])
-                                training_update_names.append(loss_training_updates[j][0].auto_name)
-
+                loss = zip(self.loss_list, self.trainable_exclude_list)
             else:
-                training_updates = self.optimizer.get_updates(self._collected_trainable_weights,
-                                                              self.constraints,
-                                                              self.total_loss)
+                loss = self.total_loss
+            training_updates = self.optimizer.get_updates(self._collected_trainable_weights,
+                                                          self.constraints,
+                                                          loss)
             updates = self.updates + training_updates
 
             # returns loss and metrics. Updates weights at each call.

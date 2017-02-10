@@ -77,7 +77,20 @@ class Optimizer(object):
         raise NotImplementedError
 
     def get_gradients(self, loss, params):
-        grads = K.gradients(loss, params)
+        if isinstance(loss, list):
+            import pdb
+            for loss_num, tup in enumerate(loss):
+                idx = [i for i in range(len(params)) if params[i].name not in tup[1]]
+                these_params = [params[i] for i in idx]
+                these_grads = K.gradients(tup[0], these_params)
+                # is only going to work if the initial loss uses all params
+                if loss_num == 0:
+                    grads = these_grads
+                else:
+                    for n, i in enumerate(idx):
+                        grads[i] = grads[i] + these_grads[n]
+        else:
+            grads = K.gradients(loss, params)
         if hasattr(self, 'clipnorm') and self.clipnorm > 0:
             norm = K.sqrt(sum([K.sum(K.square(g)) for g in grads]))
             grads = [clip_norm(g, self.clipnorm, norm) for g in grads]
