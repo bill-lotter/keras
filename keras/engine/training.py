@@ -475,7 +475,7 @@ class Model(Container):
             kwargs: when using the Theano backend, these arguments
                 are passed into K.function. Ignored for Tensorflow backend.
         """
-        use_trainable_by_loss = trainable_exclude_list is not None
+        use_trainable_by_loss = trainable_exclude_list is not None and len(trainable_exclude_list) and isinstance(trainable_exclude_list[0], list)
         self.optimizer = optimizers.get(optimizer)
         self.sample_weight_mode = sample_weight_mode
         self.loss = loss
@@ -644,7 +644,6 @@ class Model(Container):
         # add regularization penalties
         # and other layer-specific losses
         for loss_tensor in self.losses:
-            pdb.set_trace()
             total_loss += loss_tensor
 
         # list of same size as output_names.
@@ -708,6 +707,8 @@ class Model(Container):
 
         # collected trainable weights and sort them deterministically.
         trainable_weights = self.trainable_weights
+        if self.trainable_exclude_list is not None and not self.use_trainable_by_loss:
+            trainable_weights = [w for w in trainable_weights if w.name not in self.trainable_exclude_list]
         # Sort weights by name
         if trainable_weights:
             if K.backend() == 'theano':

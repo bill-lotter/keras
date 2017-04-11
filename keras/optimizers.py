@@ -78,7 +78,6 @@ class Optimizer(object):
 
     def get_gradients(self, loss, params):
         if isinstance(loss, list):
-            import pdb
             for loss_num, tup in enumerate(loss):
                 idx = [i for i in range(len(params)) if params[i].name not in tup[1]]
                 these_params = [params[i] for i in idx]

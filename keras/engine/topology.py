@@ -172,7 +172,6 @@ class Node(object):
             output_tensors = to_list(outbound_layer.call(input_tensors, mask=input_masks))
             output_masks = to_list(outbound_layer.compute_mask(input_tensors, input_masks))
             output_shapes = to_list(outbound_layer.get_output_shape_for(input_shapes))
-
         if not output_tensors or output_tensors[0] is None:
             raise TypeError('The `call` method of layer "' +
                             outbound_layer.name +
@@ -1333,10 +1332,10 @@ class Merge(Layer):
 
         if mode in {'sum', 'mul', 'ave', 'cos', 'max'}:
             input_shapes_set = set(input_shapes)
-            if len(input_shapes_set) > 1:
-                raise ValueError('Only layers of same output shape can '
-                                 'be merged using ' + mode + ' mode. ' +
-                                 'Layer shapes: %s' % input_shapes)
+            # if len(input_shapes_set) > 1:
+            #     raise ValueError('Only layers of same output shape can '
+            #                      'be merged using ' + mode + ' mode. ' +
+            #                      'Layer shapes: %s' % input_shapes)
         if mode in {'cos', 'dot'}:
             if len(layers) > 2:
                 raise ValueError(mode + ' merge takes exactly 2 layers')
