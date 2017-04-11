@@ -8,55 +8,157 @@ import sys
 import six
 import marshal
 import types as python_types
+import inspect
+
+_GLOBAL_CUSTOM_OBJECTS = {}
 
 
-def get_from_module(identifier, module_params, module_name,
-                    instantiate=False, kwargs=None):
-    """Retrieves a class of function member of a module.
+class CustomObjectScope(object):
+    """Provides a scope that changes to `_GLOBAL_CUSTOM_OBJECTS` cannot escape.
+
+    Code within a `with` statement will be able to access custom objects
+    by name. Changes to global custom objects persist
+    within the enclosing `with` statement. At end of the `with` statement,
+    global custom objects are reverted to state
+    at beginning of the `with` statement.
+
+    # Example
+
+    Consider a custom object `MyObject`
+
+    ```python
+        with CustomObjectScope({"MyObject":MyObject}):
+            layer = Dense(..., W_regularizer="MyObject")
+            # save, load, etc. will recognize custom object by name
+    ```
+    """
+
+    def __init__(self, *args):
+        self.custom_objects = args
+        self.backup = None
+
+    def __enter__(self):
+        self.backup = _GLOBAL_CUSTOM_OBJECTS.copy()
+        for objects in self.custom_objects:
+            _GLOBAL_CUSTOM_OBJECTS.update(objects)
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        _GLOBAL_CUSTOM_OBJECTS.clear()
+        _GLOBAL_CUSTOM_OBJECTS.update(self.backup)
+
+
+def custom_object_scope(*args):
+    """Provides a scope that changes to `_GLOBAL_CUSTOM_OBJECTS` cannot escape.
+
+    Convenience wrapper for `CustomObjectScope`.
+    Code within a `with` statement will be able to access custom objects
+    by name. Changes to global custom objects persist
+    within the enclosing `with` statement. At end of the `with` statement,
+    global custom objects are reverted to state
+    at beginning of the `with` statement.
+
+    # Example
+
+    Consider a custom object `MyObject`
+
+    ```python
+        with custom_object_scope({"MyObject":MyObject}):
+            layer = Dense(..., W_regularizer="MyObject")
+            # save, load, etc. will recognize custom object by name
+    ```
 
     # Arguments
-        identifier: the object to retrieve. It could be specified
-            by name (as a string), or by dict. In any other case,
-            `identifier` itself will be returned without any changes.
-        module_params: the members of a module
-            (e.g. the output of `globals()`).
-        module_name: string; the name of the target module. Only used
-            to format error messages.
-        instantiate: whether to instantiate the returned object
-            (if it's a class).
-        kwargs: a dictionary of keyword arguments to pass to the
-            class constructor if `instantiate` is `True`.
+        *args: Variable length list of dictionaries of name,
+            class pairs to add to custom objects.
 
     # Returns
-        The target object.
-
-    # Raises
-        ValueError: if the identifier cannot be found.
+        Object of type `CustomObjectScope`.
     """
-    if isinstance(identifier, six.string_types):
-        res = module_params.get(identifier)
-        if not res:
-            raise ValueError('Invalid ' + str(module_name) + ': ' +
-                             str(identifier))
-        if instantiate and not kwargs:
-            return res()
-        elif instantiate and kwargs:
-            return res(**kwargs)
-        else:
-            return res
-    elif isinstance(identifier, dict):
-        name = identifier.pop('name')
-        res = module_params.get(name)
-        if res:
-            return res(**identifier)
-        else:
-            raise ValueError('Invalid ' + str(module_name) + ': ' +
-                             str(identifier))
-    return identifier
+    return CustomObjectScope(*args)
 
 
-def make_tuple(*args):
-    return args
+def get_custom_objects():
+    """Retrieves a live reference to the global dictionary of custom objects.
+
+    Updating and clearing custom objects using `custom_object_scope`
+    is preferred, but `get_custom_objects` can
+    be used to directly access `_GLOBAL_CUSTOM_OBJECTS`.
+
+    # Example
+
+    ```python
+        get_custom_objects().clear()
+        get_custom_objects()["MyObject"] = MyObject
+    ```
+
+    # Returns
+        Global dictionary of names to classes (`_GLOBAL_CUSTOM_OBJECTS`).
+    """
+    return _GLOBAL_CUSTOM_OBJECTS
+
+
+def serialize_keras_object(instance):
+    if instance is None:
+        return None
+    if hasattr(instance, 'get_config'):
+        return {
+            'class_name': instance.__class__.__name__,
+            'config': instance.get_config()
+        }
+    if hasattr(instance, '__name__'):
+        return instance.__name__
+    else:
+        raise ValueError('Cannot serialize', instance)
+
+
+def deserialize_keras_object(identifier, module_objects=None,
+                             custom_objects=None,
+                             printable_module_name='object'):
+    if isinstance(identifier, dict):
+        # In this case we are dealing with a Keras config dictionary.
+        config = identifier
+        if 'class_name' not in config or 'config' not in config:
+            raise ValueError('Improper config format: ' + str(config))
+        class_name = config['class_name']
+        if custom_objects and class_name in custom_objects:
+            cls = custom_objects[class_name]
+        elif class_name in _GLOBAL_CUSTOM_OBJECTS:
+            cls = _GLOBAL_CUSTOM_OBJECTS[class_name]
+        else:
+            module_objects = module_objects or {}
+            cls = module_objects.get(class_name)
+            if cls is None:
+                raise ValueError('Unknown ' + printable_module_name +
+                                 ': ' + class_name)
+        if hasattr(cls, 'from_config'):
+            arg_spec = inspect.getargspec(cls.from_config)
+            if 'custom_objects' in arg_spec.args:
+                custom_objects = custom_objects or {}
+                return cls.from_config(config['config'],
+                                       custom_objects=dict(list(_GLOBAL_CUSTOM_OBJECTS.items()) +
+                                                           list(custom_objects.items())))
+            return cls.from_config(config['config'])
+        else:
+            # Then `cls` may be a function returning a class.
+            # in this case by convention `config` holds
+            # the kwargs of the function.
+            return cls(**config['config'])
+    elif isinstance(identifier, six.string_types):
+        function_name = identifier
+        if custom_objects and function_name in custom_objects:
+            fn = custom_objects.get(function_name)
+        elif function_name in _GLOBAL_CUSTOM_OBJECTS:
+            fn = _GLOBAL_CUSTOM_OBJECTS[function_name]
+        else:
+            fn = module_objects.get(function_name)
+            if fn is None:
+                raise ValueError('Unknown ' + printable_module_name,
+                                 ':' + function_name)
+        return fn
+    else:
+        raise ValueError('Could not interpret serialized ' +
+                         printable_module_name + ': ' + identifier)
 
 
 def func_dump(func):
@@ -91,6 +193,8 @@ def func_load(code, defaults=None, closure=None, globs=None):
     """
     if isinstance(code, (tuple, list)):  # unpack previous dump
         code, defaults, closure = code
+        if isinstance(defaults, list):
+            defaults = tuple(defaults)
     code = marshal.loads(code.encode('raw_unicode_escape'))
     if globs is None:
         globs = globals()
@@ -108,7 +212,7 @@ class Progbar(object):
         interval: Minimum visual progress update interval (in seconds).
     """
 
-    def __init__(self, target, width=30, verbose=1, interval=0.01):
+    def __init__(self, target, width=30, verbose=1, interval=0.05):
         self.width = width
         self.target = target
         self.sum_values = {}
