@@ -80,7 +80,7 @@ def paint_text(text, w, h, rotate=False, ud=False, multi_fonts=False):
     with cairo.Context(surface) as context:
         context.set_source_rgb(1, 1, 1)  # White
         context.paint()
-        # this font list works in Centos 7
+        # this font list works in CentOS 7
         if multi_fonts:
             fonts = ['Century Schoolbook', 'Courier', 'STIX', 'URW Chancery L', 'FreeMono']
             context.select_font_face(np.random.choice(fonts), cairo.FONT_SLANT_NORMAL,
@@ -136,8 +136,8 @@ def shuffle_mats_or_lists(matrix_list, stop_ind=None):
         elif isinstance(mat, list):
             ret.append([mat[i] for i in a])
         else:
-            raise TypeError('shuffle_mats_or_lists only supports '
-                            'numpy.array and list objects')
+            raise TypeError('`shuffle_mats_or_lists` only supports '
+                            'numpy.array and list objects.')
     return ret
 
 
@@ -409,6 +409,7 @@ def train(run_name, start_epoch, stop_epoch, img_w):
     pool_size = 2
     time_dense_size = 32
     rnn_size = 512
+    minibatch_size = 32
 
     if K.image_data_format() == 'channels_first':
         input_shape = (1, img_w, img_h)
@@ -420,7 +421,7 @@ def train(run_name, start_epoch, stop_epoch, img_w):
 
     img_gen = TextImageGenerator(monogram_file=os.path.join(fdir, 'wordlist_mono_clean.txt'),
                                  bigram_file=os.path.join(fdir, 'wordlist_bi_clean.txt'),
-                                 minibatch_size=32,
+                                 minibatch_size=minibatch_size,
                                  img_w=img_w,
                                  img_h=img_h,
                                  downsample_factor=(pool_size ** 2),
@@ -443,7 +444,7 @@ def train(run_name, start_epoch, stop_epoch, img_w):
     # cuts down input size going into RNN:
     inner = Dense(time_dense_size, activation=act, name='dense1')(inner)
 
-    # Two layers of bidirecitonal GRUs
+    # Two layers of bidirectional GRUs
     # GRU seems to work as well, if not better than LSTM:
     gru_1 = GRU(rnn_size, return_sequences=True, kernel_initializer='he_normal', name='gru1')(inner)
     gru_1b = GRU(rnn_size, return_sequences=True, go_backwards=True, kernel_initializer='he_normal', name='gru1_b')(inner)
@@ -479,9 +480,13 @@ def train(run_name, start_epoch, stop_epoch, img_w):
 
     viz_cb = VizCallback(run_name, test_func, img_gen.next_val())
 
-    model.fit_generator(generator=img_gen.next_train(), steps_per_epoch=(words_per_epoch - val_words),
-                        epochs=stop_epoch, validation_data=img_gen.next_val(), validation_steps=val_words,
-                        callbacks=[viz_cb, img_gen], initial_epoch=start_epoch)
+    model.fit_generator(generator=img_gen.next_train(),
+                        steps_per_epoch=(words_per_epoch - val_words) // minibatch_size,
+                        epochs=stop_epoch,
+                        validation_data=img_gen.next_val(),
+                        validation_steps=val_words // minibatch_size,
+                        callbacks=[viz_cb, img_gen],
+                        initial_epoch=start_epoch)
 
 
 if __name__ == '__main__':
