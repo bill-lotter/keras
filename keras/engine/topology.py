@@ -2781,6 +2781,12 @@ class Container(Layer):
                 weight_values = [g[weight_name] for weight_name in weight_names]
                 layer = flattened_layers[k]
                 symbolic_weights = layer.weights
+                sym_weight_names = [w.name for w in symbolic_weights]
+                w_idx = np.argsort(weight_names)
+                weight_names = [weight_names[i] for i in w_idx]
+                weight_values = [weight_values[i] for i in w_idx]
+                w_idx = np.argsort(sym_weight_names)
+                symbolic_weights = [symbolic_weights[i] for i in w_idx]
                 if len(weight_values) != len(symbolic_weights):
                     raise ValueError('Layer #' + str(k) +
                                      ' (named "' + layer.name +
