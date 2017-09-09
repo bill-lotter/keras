@@ -67,6 +67,9 @@ class BatchNormalization(Layer):
                  gamma_regularizer=None,
                  beta_constraint=None,
                  gamma_constraint=None,
+                 use_batch_train=True,
+                 use_batch_inf=False,
+                 update_ma=True,
                  **kwargs):
         super(BatchNormalization, self).__init__(**kwargs)
         self.supports_masking = True
@@ -83,6 +86,9 @@ class BatchNormalization(Layer):
         self.gamma_regularizer = regularizers.get(gamma_regularizer)
         self.beta_constraint = constraints.get(beta_constraint)
         self.gamma_constraint = constraints.get(gamma_constraint)
+        self.use_batch_train = use_batch_train
+        self.use_batch_inf = use_batch_inf
+        self.update_ma = update_ma
 
     def build(self, input_shape):
         dim = input_shape[self.axis]
@@ -176,17 +182,18 @@ class BatchNormalization(Layer):
             inputs, self.gamma, self.beta, reduction_axes,
             epsilon=self.epsilon)
 
-        self.add_update([K.moving_average_update(self.moving_mean,
-                                                 mean,
-                                                 self.momentum),
-                         K.moving_average_update(self.moving_variance,
-                                                 variance,
-                                                 self.momentum)],
-                        inputs)
+        if self.update_ma:
+            self.add_update([K.moving_average_update(self.moving_mean,
+                                                     mean,
+                                                     self.momentum),
+                             K.moving_average_update(self.moving_variance,
+                                                     variance,
+                                                     self.momentum)],
+                            inputs)
 
         # Pick the normalized form corresponding to the training phase.
-        return K.in_train_phase(normed_training,
-                                normalize_inference,
+        return K.in_train_phase(normed_training if self.use_batch_train else normalize_inference,
+                                normed_training if self.use_batch_inf else normalize_inference,
                                 training=training)
 
     def get_config(self):
@@ -203,7 +210,10 @@ class BatchNormalization(Layer):
             'beta_regularizer': regularizers.serialize(self.beta_regularizer),
             'gamma_regularizer': regularizers.serialize(self.gamma_regularizer),
             'beta_constraint': constraints.serialize(self.beta_constraint),
-            'gamma_constraint': constraints.serialize(self.gamma_constraint)
+            'gamma_constraint': constraints.serialize(self.gamma_constraint),
+            'use_batch_train': self.use_batch_train,
+            'use_batch_inf': self.use_batch_inf,
+            'update_ma': self.update_ma,
         }
         base_config = super(BatchNormalization, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
