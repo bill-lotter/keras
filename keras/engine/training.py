@@ -1844,7 +1844,8 @@ class Model(Container):
                       workers=1,
                       use_multiprocessing=False,
                       shuffle=True,
-                      initial_epoch=0):
+                      initial_epoch=0,
+                      val_alt_metric=None):
         """Fits the model on data yielded batch-by-batch by a Python generator.
 
         The generator is run in parallel to the model, for efficiency.
@@ -2065,7 +2066,8 @@ class Model(Container):
                                 validation_steps,
                                 max_queue_size=max_queue_size,
                                 workers=workers,
-                                use_multiprocessing=use_multiprocessing)
+                                use_multiprocessing=use_multiprocessing,
+                                alt_metric=val_alt_metric)
                         else:
                             # No need for try/except because
                             # data has already been validated.
@@ -2099,7 +2101,8 @@ class Model(Container):
     def evaluate_generator(self, generator, steps,
                            max_queue_size=10,
                            workers=1,
-                           use_multiprocessing=False):
+                           use_multiprocessing=False,
+                           alt_metric=None):
         """Evaluates the model on a data generator.
 
         The generator should return the same kind of data
@@ -2177,7 +2180,10 @@ class Model(Container):
                                      '(x, y, sample_weight) '
                                      'or (x, y). Found: ' +
                                      str(generator_output))
-                outs = self.test_on_batch(x, y, sample_weight=sample_weight)
+                if alt_metric is None:
+                    outs = self.test_on_batch(x, y, sample_weight=sample_weight)
+                else:
+                    outs = self.predict_on_batch(x)
 
                 if isinstance(x, list):
                     batch_size = len(x[0])
@@ -2197,6 +2203,9 @@ class Model(Container):
             if enqueuer is not None:
                 enqueuer.stop()
 
+        if alt_metric is not None:
+            import pdb; pdb.set_trace()
+
         if not isinstance(outs, list):
             return np.average(np.asarray(all_outs),
                               weights=batch_sizes)
@@ -2212,7 +2221,8 @@ class Model(Container):
                           max_queue_size=10,
                           workers=1,
                           use_multiprocessing=False,
-                          verbose=0):
+                          verbose=0,
+                          include_y=False):
         """Generates predictions for the input samples from a data generator.
 
         The generator should return the same kind of data as accepted by
@@ -2278,9 +2288,9 @@ class Model(Container):
                     # Compatibility with the generators
                     # used for training.
                     if len(generator_output) == 2:
-                        x, _ = generator_output
+                        x, y = generator_output
                     elif len(generator_output) == 3:
-                        x, _, _ = generator_output
+                        x, y, _ = generator_output
                     else:
                         raise ValueError('Output of generator should be '
                                          'a tuple `(x, y, sample_weight)` '
@@ -2294,7 +2304,8 @@ class Model(Container):
                 outs = self.predict_on_batch(x)
                 if not isinstance(outs, list):
                     outs = [outs]
-
+                if include_y:
+                    import pdb; pdb.set_trace()
                 if not all_outs:
                     for out in outs:
                         all_outs.append([])
