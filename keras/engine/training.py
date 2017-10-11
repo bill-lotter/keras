@@ -2071,11 +2071,18 @@ class Model(Container):
                         else:
                             # No need for try/except because
                             # data has already been validated.
-                            val_outs = self.evaluate(
-                                val_x, val_y,
-                                batch_size=batch_size,
-                                sample_weight=val_sample_weights,
-                                verbose=0)
+                            if val_alt_metric is None:
+                                val_outs = self.evaluate(
+                                    val_x, val_y,
+                                    batch_size=batch_size,
+                                    sample_weight=val_sample_weights,
+                                    verbose=0)
+                            else:
+                                val_outs = self.predict(
+                                    val_x,
+                                    batch_size=batch_size,
+                                    verbose=0)
+                                val_outs = val_alt_metric(val_y[0], val_outs)
                         if not isinstance(val_outs, list):
                             val_outs = [val_outs]
                         # Same labels assumed.
