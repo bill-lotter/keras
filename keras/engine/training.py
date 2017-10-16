@@ -1994,7 +1994,7 @@ class Model(Container):
                             ' Please consider using the`keras.utils.Sequence'
                             ' class.'))
         enqueuer = None
-
+        import time
         try:
             if is_sequence:
                 enqueuer = OrderedEnqueuer(generator,
@@ -2013,7 +2013,10 @@ class Model(Container):
                 steps_done = 0
                 batch_index = 0
                 while steps_done < steps_per_epoch:
+                    t0 = time.time()
                     generator_output = next(output_generator)
+                    t1 = time.time()
+                    #print('time to gen: ' + str(t1-t0))
 
                     if not hasattr(generator_output, '__len__'):
                         raise ValueError('Output of generator should be '
@@ -2041,11 +2044,13 @@ class Model(Container):
                     batch_logs['batch'] = batch_index
                     batch_logs['size'] = batch_size
                     callbacks.on_batch_begin(batch_index, batch_logs)
-
+                    #print('time to process: ' + str(time.time()-t1))
+                    t2 = time.time()
                     outs = self.train_on_batch(x, y,
                                                sample_weight=sample_weight,
                                                class_weight=class_weight)
-
+                    t3 = time.time()
+                    #print('time to train: ' + str(t3 - t2))
                     if not isinstance(outs, list):
                         outs = [outs]
                     for l, o in zip(out_labels, outs):
@@ -2151,6 +2156,7 @@ class Model(Container):
         all_outs = []
         batch_sizes = []
         is_sequence = isinstance(generator, Sequence)
+        all_y = []
         if not is_sequence and use_multiprocessing and workers > 1:
             warnings.warn(
                 UserWarning('Using a generator with `use_multiprocessing=True`'
@@ -2202,7 +2208,7 @@ class Model(Container):
                     raise ValueError('Received an empty batch. '
                                      'Batches should at least contain one item.')
                 all_outs.append(outs)
-
+                all_y.append(y)
                 steps_done += 1
                 batch_sizes.append(batch_size)
 
@@ -2211,7 +2217,10 @@ class Model(Container):
                 enqueuer.stop()
 
         if alt_metric is not None:
-            import pdb; pdb.set_trace()
+            y_hat = np.array(all_outs).flatten()
+            y = np.array(all_y)
+            return alt_metric(y, y_hat)
+
 
         if not isinstance(outs, list):
             return np.average(np.asarray(all_outs),
