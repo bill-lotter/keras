@@ -174,8 +174,8 @@ class BatchNormalization(Layer):
                     epsilon=self.epsilon)
 
         # If the learning phase is *static* and set to inference:
-        if training in {0, False}:
-            return normalize_inference()
+        # if training in {0, False}:
+        #     return normalize_inference()
 
         # If the learning is either dynamic, or set to training:
         normed_training, mean, variance = K.normalize_batch_in_training(
