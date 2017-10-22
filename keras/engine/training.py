@@ -2321,7 +2321,7 @@ class Model(Container):
                 if not isinstance(outs, list):
                     outs = [outs]
                 if include_y:
-                    import pdb; pdb.set_trace()
+                    outs.append(y)
                 if not all_outs:
                     for out in outs:
                         all_outs.append([])
