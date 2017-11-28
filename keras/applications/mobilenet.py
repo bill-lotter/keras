@@ -296,7 +296,8 @@ def MobileNet(input_shape=None,
               weights='imagenet',
               input_tensor=None,
               pooling=None,
-              classes=1000):
+              classes=1000,
+              bn_use_batch_inf=False):
     """Instantiates the MobileNet architecture.
 
     Note that only TensorFlow is supported for now,
@@ -406,6 +407,8 @@ def MobileNet(input_shape=None,
         row_axis, col_axis = (1, 2)
     rows = input_shape[row_axis]
     cols = input_shape[col_axis]
+    if rows is None:
+        rows = default_size
 
     if weights == 'imagenet':
         if depth_multiplier != 1:
@@ -417,11 +420,11 @@ def MobileNet(input_shape=None,
                              'alpha can be one of'
                              '`0.25`, `0.50`, `0.75` or `1.0` only.')
 
-        if rows != cols or rows not in [128, 160, 192, 224]:
-            raise ValueError('If imagenet weights are being loaded, '
-                             'input must have a static square shape (one of '
-                             '(128,128), (160,160), (192,192), or (224, 224)).'
-                             ' Input shape provided = %s' % (input_shape,))
+        # if rows != cols or rows not in [128, 160, 192, 224]:
+        #     raise ValueError('If imagenet weights are being loaded, '
+        #                      'input must have a static square shape (one of '
+        #                      '(128,128), (160,160), (192,192), or (224, 224)).'
+        #                      ' Input shape provided = %s' % (input_shape,))
 
     if K.image_data_format() != 'channels_last':
         warnings.warn('The MobileNet family of models is only available '
@@ -446,28 +449,28 @@ def MobileNet(input_shape=None,
         else:
             img_input = input_tensor
 
-    x = _conv_block(img_input, 32, alpha, strides=(2, 2))
-    x = _depthwise_conv_block(x, 64, alpha, depth_multiplier, block_id=1)
+    x = _conv_block(img_input, 32, alpha, strides=(2, 2), bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 64, alpha, depth_multiplier, block_id=1, bn_use_batch_inf=bn_use_batch_inf)
 
     x = _depthwise_conv_block(x, 128, alpha, depth_multiplier,
-                              strides=(2, 2), block_id=2)
-    x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=3)
+                              strides=(2, 2), block_id=2, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 128, alpha, depth_multiplier, block_id=3, bn_use_batch_inf=bn_use_batch_inf)
 
     x = _depthwise_conv_block(x, 256, alpha, depth_multiplier,
-                              strides=(2, 2), block_id=4)
-    x = _depthwise_conv_block(x, 256, alpha, depth_multiplier, block_id=5)
+                              strides=(2, 2), block_id=4, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 256, alpha, depth_multiplier, block_id=5, bn_use_batch_inf=bn_use_batch_inf)
 
     x = _depthwise_conv_block(x, 512, alpha, depth_multiplier,
-                              strides=(2, 2), block_id=6)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=7)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=8)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=9)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=10)
-    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=11)
+                              strides=(2, 2), block_id=6, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=7, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=8, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=9, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=10, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 512, alpha, depth_multiplier, block_id=11, bn_use_batch_inf=bn_use_batch_inf)
 
     x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier,
-                              strides=(2, 2), block_id=12)
-    x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=13)
+                              strides=(2, 2), block_id=12, bn_use_batch_inf=bn_use_batch_inf)
+    x = _depthwise_conv_block(x, 1024, alpha, depth_multiplier, block_id=13, bn_use_batch_inf=bn_use_batch_inf)
 
     if include_top:
         if K.image_data_format() == 'channels_first':
@@ -531,7 +534,7 @@ def MobileNet(input_shape=None,
     return model
 
 
-def _conv_block(inputs, filters, alpha, kernel=(3, 3), strides=(1, 1)):
+def _conv_block(inputs, filters, alpha, kernel=(3, 3), strides=(1, 1), bn_use_batch_inf=False):
     """Adds an initial convolution layer (with batch normalization and relu6).
 
     # Arguments
@@ -584,12 +587,12 @@ def _conv_block(inputs, filters, alpha, kernel=(3, 3), strides=(1, 1)):
                use_bias=False,
                strides=strides,
                name='conv1')(inputs)
-    x = BatchNormalization(axis=channel_axis, name='conv1_bn')(x)
+    x = BatchNormalization(axis=channel_axis, use_batch_inf=bn_use_batch_inf, name='conv1_bn')(x)
     return Activation(relu6, name='conv1_relu')(x)
 
 
 def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha,
-                          depth_multiplier=1, strides=(1, 1), block_id=1):
+                          depth_multiplier=1, strides=(1, 1), block_id=1, bn_use_batch_inf=False):
     """Adds a depthwise convolution block.
 
     A depthwise convolution block consists of a depthwise conv,
@@ -646,7 +649,7 @@ def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha,
                         strides=strides,
                         use_bias=False,
                         name='conv_dw_%d' % block_id)(inputs)
-    x = BatchNormalization(axis=channel_axis, name='conv_dw_%d_bn' % block_id)(x)
+    x = BatchNormalization(axis=channel_axis, use_batch_inf=bn_use_batch_inf, name='conv_dw_%d_bn' % block_id)(x)
     x = Activation(relu6, name='conv_dw_%d_relu' % block_id)(x)
 
     x = Conv2D(pointwise_conv_filters, (1, 1),
@@ -654,5 +657,5 @@ def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha,
                use_bias=False,
                strides=(1, 1),
                name='conv_pw_%d' % block_id)(x)
-    x = BatchNormalization(axis=channel_axis, name='conv_pw_%d_bn' % block_id)(x)
+    x = BatchNormalization(axis=channel_axis, use_batch_inf=bn_use_batch_inf, name='conv_pw_%d_bn' % block_id)(x)
     return Activation(relu6, name='conv_pw_%d_relu' % block_id)(x)
