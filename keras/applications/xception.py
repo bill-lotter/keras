@@ -17,9 +17,11 @@ due to its reliance on `SeparableConvolution` layers.
 - [Xception: Deep Learning with Depthwise Separable Convolutions](https://arxiv.org/abs/1610.02357)
 
 """
-from __future__ import print_function
 from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
+import os
 import warnings
 
 from ..models import Model
@@ -36,6 +38,7 @@ from ..layers import GlobalMaxPooling2D
 from ..engine.topology import get_source_inputs
 from ..utils.data_utils import get_file
 from .. import backend as K
+from . import imagenet_utils
 from .imagenet_utils import decode_predictions
 from .imagenet_utils import _obtain_input_shape
 
@@ -62,8 +65,9 @@ def Xception(include_top=True, weights='imagenet',
     # Arguments
         include_top: whether to include the fully-connected
             layer at the top of the network.
-        weights: one of `None` (random initialization)
-            or 'imagenet' (pre-training on ImageNet).
+        weights: one of `None` (random initialization),
+              'imagenet' (pre-training on ImageNet),
+              or the path to the weights file to be loaded.
         input_tensor: optional Keras tensor (i.e. output of `layers.Input()`)
             to use as image input for the model.
         input_shape: optional shape tuple, only to be specified
@@ -96,10 +100,11 @@ def Xception(include_top=True, weights='imagenet',
         RuntimeError: If attempting to run this model with a
             backend that does not support separable convolutions.
     """
-    if weights not in {'imagenet', None}:
+    if not (weights in {'imagenet', None} or os.path.exists(weights)):
         raise ValueError('The `weights` argument should be either '
-                         '`None` (random initialization) or `imagenet` '
-                         '(pre-training on ImageNet).')
+                         '`None` (random initialization), `imagenet` '
+                         '(pre-training on ImageNet), '
+                         'or the path to the weights file to be loaded.')
 
     if weights == 'imagenet' and include_top and classes != 1000:
         raise ValueError('If using `weights` as imagenet with `include_top`'
@@ -248,12 +253,16 @@ def Xception(include_top=True, weights='imagenet',
         if include_top:
             weights_path = get_file('xception_weights_tf_dim_ordering_tf_kernels.h5',
                                     TF_WEIGHTS_PATH,
-                                    cache_subdir='models')
+                                    cache_subdir='models',
+                                    file_hash='0a58e3b7378bc2990ea3b43d5981f1f6')
         else:
             weights_path = get_file('xception_weights_tf_dim_ordering_tf_kernels_notop.h5',
                                     TF_WEIGHTS_PATH_NO_TOP,
-                                    cache_subdir='models')
+                                    cache_subdir='models',
+                                    file_hash='b0042744bf5b25fce3cb969f33bebb97')
         model.load_weights(weights_path)
+    elif weights is not None:
+        model.load_weights(weights)
 
     if old_data_format:
         K.set_image_data_format(old_data_format)
@@ -261,7 +270,12 @@ def Xception(include_top=True, weights='imagenet',
 
 
 def preprocess_input(x):
-    x /= 255.
-    x -= 0.5
-    x *= 2.
-    return x
+    """Preprocesses a numpy array encoding a batch of images.
+
+    # Arguments
+        x: a 4D numpy array consists of RGB values within [0, 255].
+
+    # Returns
+        Preprocessed array.
+    """
+    return imagenet_utils.preprocess_input(x, mode='tf')
