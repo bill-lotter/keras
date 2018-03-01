@@ -2217,7 +2217,7 @@ class Model(Container):
                 enqueuer.stop()
 
         if alt_metric is not None:
-            y_hat = np.array(all_outs).flatten()
+            y_hat = np.array(all_outs).squeeze()
             y = np.array(all_y)
             return alt_metric(y, y_hat)
 
