@@ -2211,9 +2211,9 @@ class Model(Container):
                 steps_done = 0
                 batch_index = 0
                 while steps_done < steps_per_epoch:
-                    t0 = time.time()
+
                     generator_output = next(output_generator)
-                    t1 = time.time()
+
                     #print('time to gen: ' + str(t1-t0))
 
                     if not hasattr(generator_output, '__len__'):
@@ -2244,11 +2244,11 @@ class Model(Container):
                     batch_logs['size'] = batch_size
                     callbacks.on_batch_begin(batch_index, batch_logs)
                     #print('time to process: ' + str(time.time()-t1))
-                    t2 = time.time()
+
                     outs = self.train_on_batch(x, y,
                                                sample_weight=sample_weight,
                                                class_weight=class_weight)
-                    t3 = time.time()
+
                     #print('time to train: ' + str(t3 - t2))
                     if not isinstance(outs, list):
                         outs = [outs]

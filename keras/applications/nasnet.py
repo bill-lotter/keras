@@ -77,7 +77,9 @@ def NASNet(input_shape=None,
            input_tensor=None,
            pooling=None,
            classes=1000,
-           default_size=None):
+           default_size=None,
+           bn_use_batch_inf=False,
+           bn_use_batch_train=True):
     '''Instantiates a NASNet model.
 
     Note that only TensorFlow is supported for now,
@@ -212,34 +214,41 @@ def NASNet(input_shape=None,
                    kernel_initializer='he_normal')(img_input)
 
     x = BatchNormalization(axis=channel_dim, momentum=0.9997,
-                           epsilon=1e-3, name='stem_bn1')(x)
+                           epsilon=1e-3, name='stem_bn1',
+                           use_batch_inf=bn_use_batch_inf, use_batch_train=bn_use_batch_train)(x)
 
     p = None
     if not skip_reduction:  # imagenet / mobile mode
         x, p = _reduction_a_cell(x, p, filters // (filter_multiplier ** 2),
+                                bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                  block_id='stem_1')
         x, p = _reduction_a_cell(x, p, filters // filter_multiplier,
+                                bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                  block_id='stem_2')
 
     for i in range(num_blocks):
-        x, p = _normal_a_cell(x, p, filters, block_id='%d' % (i))
+        x, p = _normal_a_cell(x, p, filters, bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train, block_id='%d' % (i))
 
     x, p0 = _reduction_a_cell(x, p, filters * filter_multiplier,
+                            bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                               block_id='reduce_%d' % (num_blocks))
 
     p = p0 if not skip_reduction else p
 
     for i in range(num_blocks):
         x, p = _normal_a_cell(x, p, filters * filter_multiplier,
+                            bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                               block_id='%d' % (num_blocks + i + 1))
 
     x, p0 = _reduction_a_cell(x, p, filters * filter_multiplier ** 2,
+                            bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                               block_id='reduce_%d' % (2 * num_blocks))
 
     p = p0 if not skip_reduction else p
 
     for i in range(num_blocks):
         x, p = _normal_a_cell(x, p, filters * filter_multiplier ** 2,
+                            bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                               block_id='%d' % (2 * num_blocks + i + 1))
 
     x = Activation('relu')(x)
@@ -305,7 +314,9 @@ def NASNetLarge(input_shape=None,
                 weights='imagenet',
                 input_tensor=None,
                 pooling=None,
-                classes=1000):
+                classes=1000,
+                bn_use_batch_inf=False,
+                bn_use_batch_train=True):
     '''Instantiates a NASNet model in ImageNet mode.
 
     Note that only TensorFlow is supported for now,
@@ -363,7 +374,9 @@ def NASNetLarge(input_shape=None,
                   input_tensor=input_tensor,
                   pooling=pooling,
                   classes=classes,
-                  default_size=331)
+                  default_size=331,
+                  bn_use_batch_inf=bn_use_batch_inf,
+                  bn_use_batch_train=bn_use_batch_train)
 
 
 def NASNetMobile(input_shape=None,
@@ -371,7 +384,9 @@ def NASNetMobile(input_shape=None,
                  weights='imagenet',
                  input_tensor=None,
                  pooling=None,
-                 classes=1000):
+                 classes=1000,
+                 bn_use_batch_inf=False,
+                 bn_use_batch_train=True):
     '''Instantiates a Mobile NASNet model in ImageNet mode.
 
     Note that only TensorFlow is supported for now,
@@ -429,13 +444,17 @@ def NASNetMobile(input_shape=None,
                   input_tensor=input_tensor,
                   pooling=pooling,
                   classes=classes,
-                  default_size=224)
+                  default_size=224,
+                  bn_use_batch_inf=bn_use_batch_inf,
+                  bn_use_batch_train=bn_use_batch_train)
 
 
 def _separable_conv_block(ip, filters,
                           kernel_size=(3, 3),
                           strides=(1, 1),
-                          block_id=None):
+                          block_id=None,
+                          bn_use_batch_inf=False,
+                          bn_use_batch_train=True):
     '''Adds 2 blocks of [relu-separable conv-batchnorm].
 
     # Arguments
@@ -458,6 +477,7 @@ def _separable_conv_block(ip, filters,
                             kernel_initializer='he_normal')(x)
         x = BatchNormalization(axis=channel_dim, momentum=0.9997,
                                epsilon=1e-3,
+                               use_batch_inf=bn_use_batch_inf, use_batch_train=bn_use_batch_train,
                                name='separable_conv_1_bn_%s' % (block_id))(x)
         x = Activation('relu')(x)
         x = SeparableConv2D(filters, kernel_size,
@@ -466,11 +486,12 @@ def _separable_conv_block(ip, filters,
                             kernel_initializer='he_normal')(x)
         x = BatchNormalization(axis=channel_dim, momentum=0.9997,
                                epsilon=1e-3,
+                               use_batch_inf=bn_use_batch_inf, use_batch_train=bn_use_batch_train,
                                name='separable_conv_2_bn_%s' % (block_id))(x)
     return x
 
 
-def _adjust_block(p, ip, filters, block_id=None):
+def _adjust_block(p, ip, filters, block_id=None, bn_use_batch_inf=False, bn_use_batch_train=True):
     '''Adjusts the input `previous path` to match the shape of the `input`.
 
     Used in situations where the output number of filters needs to be changed.
@@ -518,6 +539,7 @@ def _adjust_block(p, ip, filters, block_id=None):
                 p = concatenate([p1, p2], axis=channel_dim)
                 p = BatchNormalization(axis=channel_dim, momentum=0.9997,
                                        epsilon=1e-3,
+                                       use_batch_inf=bn_use_batch_inf, use_batch_train=bn_use_batch_train,
                                        name='adjust_bn_%s' % block_id)(p)
 
         elif p_shape[channel_dim] != filters:
@@ -528,11 +550,12 @@ def _adjust_block(p, ip, filters, block_id=None):
                            use_bias=False, kernel_initializer='he_normal')(p)
                 p = BatchNormalization(axis=channel_dim, momentum=0.9997,
                                        epsilon=1e-3,
+                                       use_batch_inf=bn_use_batch_inf, use_batch_train=bn_use_batch_train,
                                        name='adjust_bn_%s' % block_id)(p)
     return p
 
 
-def _normal_a_cell(ip, p, filters, block_id=None):
+def _normal_a_cell(ip, p, filters, block_id=None, bn_use_batch_inf=False, bn_use_batch_train=True):
     '''Adds a Normal cell for NASNet-A (Fig. 4 in the paper).
 
     # Arguments
@@ -547,7 +570,7 @@ def _normal_a_cell(ip, p, filters, block_id=None):
     channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
 
     with K.name_scope('normal_A_block_%s' % block_id):
-        p = _adjust_block(p, ip, filters, block_id)
+        p = _adjust_block(p, ip, filters, block_id, bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train)
 
         h = Activation('relu')(ip)
         h = Conv2D(filters, (1, 1), strides=(1, 1), padding='same',
@@ -555,19 +578,24 @@ def _normal_a_cell(ip, p, filters, block_id=None):
                    use_bias=False, kernel_initializer='he_normal')(h)
         h = BatchNormalization(axis=channel_dim, momentum=0.9997,
                                epsilon=1e-3,
+                               use_batch_inf=bn_use_batch_inf, use_batch_train=bn_use_batch_train,
                                name='normal_bn_1_%s' % block_id)(h)
 
         with K.name_scope('block_1'):
             x1_1 = _separable_conv_block(h, filters, kernel_size=(5, 5),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='normal_left1_%s' % block_id)
             x1_2 = _separable_conv_block(p, filters,
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='normal_right1_%s' % block_id)
             x1 = add([x1_1, x1_2], name='normal_add_1_%s' % block_id)
 
         with K.name_scope('block_2'):
             x2_1 = _separable_conv_block(p, filters, (5, 5),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='normal_left2_%s' % block_id)
             x2_2 = _separable_conv_block(p, filters, (3, 3),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='normal_right2_%s' % block_id)
             x2 = add([x2_1, x2_2], name='normal_add_2_%s' % block_id)
 
@@ -585,6 +613,7 @@ def _normal_a_cell(ip, p, filters, block_id=None):
 
         with K.name_scope('block_5'):
             x5 = _separable_conv_block(h, filters,
+                                    bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                        block_id='normal_left5_%s' % block_id)
             x5 = add([x5, h], name='normal_add_5_%s' % block_id)
 
@@ -593,7 +622,7 @@ def _normal_a_cell(ip, p, filters, block_id=None):
     return x, ip
 
 
-def _reduction_a_cell(ip, p, filters, block_id=None):
+def _reduction_a_cell(ip, p, filters, block_id=None, bn_use_batch_inf=False, bn_use_batch_train=True):
     '''Adds a Reduction cell for NASNet-A (Fig. 4 in the paper).
 
     # Arguments
@@ -608,7 +637,7 @@ def _reduction_a_cell(ip, p, filters, block_id=None):
     channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
 
     with K.name_scope('reduction_A_block_%s' % block_id):
-        p = _adjust_block(p, ip, filters, block_id)
+        p = _adjust_block(p, ip, filters, block_id, bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train)
 
         h = Activation('relu')(ip)
         h = Conv2D(filters, (1, 1), strides=(1, 1), padding='same',
@@ -616,12 +645,15 @@ def _reduction_a_cell(ip, p, filters, block_id=None):
                    use_bias=False, kernel_initializer='he_normal')(h)
         h = BatchNormalization(axis=channel_dim, momentum=0.9997,
                                epsilon=1e-3,
+                               use_batch_inf=bn_use_batch_inf, use_batch_train=bn_use_batch_train,
                                name='reduction_bn_1_%s' % block_id)(h)
 
         with K.name_scope('block_1'):
             x1_1 = _separable_conv_block(h, filters, (5, 5), strides=(2, 2),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='reduction_left1_%s' % block_id)
             x1_2 = _separable_conv_block(p, filters, (7, 7), strides=(2, 2),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='reduction_1_%s' % block_id)
             x1 = add([x1_1, x1_2], name='reduction_add_1_%s' % block_id)
 
@@ -629,6 +661,7 @@ def _reduction_a_cell(ip, p, filters, block_id=None):
             x2_1 = MaxPooling2D((3, 3), strides=(2, 2), padding='same',
                                 name='reduction_left2_%s' % block_id)(h)
             x2_2 = _separable_conv_block(p, filters, (7, 7), strides=(2, 2),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='reduction_right2_%s' % block_id)
             x2 = add([x2_1, x2_2], name='reduction_add_2_%s' % block_id)
 
@@ -636,6 +669,7 @@ def _reduction_a_cell(ip, p, filters, block_id=None):
             x3_1 = AveragePooling2D((3, 3), strides=(2, 2), padding='same',
                                     name='reduction_left3_%s' % block_id)(h)
             x3_2 = _separable_conv_block(p, filters, (5, 5), strides=(2, 2),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='reduction_right3_%s' % block_id)
             x3 = add([x3_1, x3_2], name='reduction_add3_%s' % block_id)
 
@@ -646,6 +680,7 @@ def _reduction_a_cell(ip, p, filters, block_id=None):
 
         with K.name_scope('block_5'):
             x5_1 = _separable_conv_block(x1, filters, (3, 3),
+                                        bn_use_batch_inf=bn_use_batch_inf, bn_use_batch_train=bn_use_batch_train,
                                          block_id='reduction_left4_%s' % block_id)
             x5_2 = MaxPooling2D((3, 3), strides=(2, 2), padding='same',
                                 name='reduction_right5_%s' % block_id)(h)
