@@ -2434,6 +2434,10 @@ class Model(Container):
                 enqueuer.stop()
 
         if alt_metric is not None:
+            if len(all_outs[0]) > 1:
+                for k in range(len(all_outs)):
+                    all_outs[k] = all_outs[k][:1]
+                    all_y[k] = all_y[k][:1]
             y_hat = np.array(all_outs).squeeze()
             y = np.array(all_y)
             return alt_metric(y, y_hat)
@@ -2579,4 +2583,11 @@ class Model(Container):
         if steps_done == 1:
             return [out[0] for out in all_outs]
         else:
-            return [np.concatenate(out) for out in all_outs]
+            np_out = []
+            for out in all_outs:
+                try:
+                    out = np.concatenate(out)
+                except:
+                    pass
+                np_out.append(out)
+            return np_out
