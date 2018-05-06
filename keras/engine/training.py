@@ -2560,7 +2560,10 @@ class Model(Container):
                 if not isinstance(outs, list):
                     outs = [outs]
                 if include_y:
-                    outs.append(y)
+                    if isinstance(y, list):
+                        outs += y
+                    else:
+                        outs.append(y)
                 if not all_outs:
                     for out in outs:
                         all_outs.append([])
