@@ -2434,13 +2434,16 @@ class Model(Container):
                 enqueuer.stop()
 
         if alt_metric is not None:
-            if len(all_outs[0]) > 1:
-                for k in range(len(all_outs)):
-                    all_outs[k] = all_outs[k][:1]
-                    all_y[k] = all_y[k][:1]
-            y_hat = np.array(all_outs).squeeze()
-            y = np.array(all_y)
-            return alt_metric(y, y_hat)
+            if not hasattr(alt_metric, '__name__') or alt_metric.__name__ == 'neg_auc':
+                if len(all_outs[0]) > 1:
+                    for k in range(len(all_outs)):
+                        all_outs[k] = all_outs[k][:1]
+                        all_y[k] = all_y[k][:1]
+                y_hat = np.array(all_outs).squeeze()
+                y = np.array(all_y)
+                return alt_metric(y, y_hat)
+            else:
+                return alt_metric(all_y, all_outs)
 
 
         if not isinstance(outs, list):
